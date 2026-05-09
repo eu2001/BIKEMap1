@@ -71,7 +71,18 @@ final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegat
     // POI annotations, keyed by poi.id
     private var poiAnnotations: [String: POIAnnotation] = [:]
 
+    // Initial centering on user
+    private var didCenterOnUser = false
+
     init(appState: AppState) { self.appState = appState }
+
+    func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
+        guard !didCenterOnUser, let loc = userLocation.location else { return }
+        didCenterOnUser = true
+        let region = MKCoordinateRegion(center: loc.coordinate,
+                                        span: .init(latitudeDelta: 0.04, longitudeDelta: 0.04))
+        mapView.setRegion(region, animated: true)
+    }
 
     // MARK: Setup
 

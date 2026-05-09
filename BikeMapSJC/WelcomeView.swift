@@ -311,7 +311,7 @@ private struct WelcomeRegisterForm: View {
     @State private var email       = ""
     @State private var password    = ""
     @State private var confirm     = ""
-    @State private var avatar      = "capivara"
+    @State private var avatar      = "muiriqui"
     @State private var error       = ""
     @State private var loading     = false
     @State private var showPw      = false

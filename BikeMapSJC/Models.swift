@@ -5,7 +5,7 @@ import SwiftUI
 // MARK: - Infrastructure Types
 
 enum InfraType: String, CaseIterable, Codable {
-    case ciclovia, ciclofaixa, compartilhada, rota_alternativa, proibida, projetada, em_construcao
+    case ciclovia, ciclofaixa, compartilhada, rota_alternativa, proibida, em_construcao, projetada
 
     var uiColor: UIColor {
         switch self {
