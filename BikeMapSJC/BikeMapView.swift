@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import CoreLocation
 
 // MARK: - UIViewRepresentable
 
@@ -59,7 +60,8 @@ struct BikeMapView: UIViewRepresentable {
 
 // MARK: - Coordinator
 
-final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
+final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate,
+                         CLLocationManagerDelegate {
     weak var mapView: MKMapView?
     var appState: AppState
 
@@ -73,9 +75,42 @@ final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegat
 
     // Initial centering on user
     private var didCenterOnUser = false
+    private let locationManager = CLLocationManager()
 
-    init(appState: AppState) { self.appState = appState }
+    init(appState: AppState) {
+        self.appState = appState
+        super.init()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        locationManager.requestWhenInUseAuthorization()
+    }
 
+    // Called when permission is granted (or already granted) — start getting location
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        if manager.authorizationStatus == .authorizedWhenInUse ||
+           manager.authorizationStatus == .authorizedAlways {
+            manager.requestLocation()
+        }
+    }
+
+    // Called with a single location fix — center the map once, then stop
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard !didCenterOnUser, let loc = locations.last else { return }
+        didCenterOnUser = true
+        manager.stopUpdatingLocation()
+        DispatchQueue.main.async { [weak self] in
+            guard let mv = self?.mapView else { return }
+            let region = MKCoordinateRegion(center: loc.coordinate,
+                                            span: .init(latitudeDelta: 0.04, longitudeDelta: 0.04))
+            mv.setRegion(region, animated: true)
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        // Silently fall back to the default SJC view
+    }
+
+    // MKMapView also calls this delegate — keep as a safety net
     func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
         guard !didCenterOnUser, let loc = userLocation.location else { return }
         didCenterOnUser = true
