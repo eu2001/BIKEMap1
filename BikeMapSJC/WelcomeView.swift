@@ -17,14 +17,24 @@ struct WelcomeView: View {
                 VStack(spacing: 0) {
 
                     // MARK: Branding
-                    GIFView(name: "welcome", contentMode: .scaleAspectFit)
-                        .frame(width: 120, height: 120)
-                        .padding(20)
-                        .background(Color.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 28))
-                        .opacity(0.8)
-                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                    Image("logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 180, height: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 24))
+                        .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 4)
                         .padding(.top, 56)
-                        .padding(.bottom, 28)
+                        .padding(.bottom, 16)
+
+                    VStack(spacing: 4) {
+                        Text("BikeMap SJC")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text("Mapa Cicloviário de SJC")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.bottom, 28)
 
                     // MARK: Auth card
                     VStack(spacing: 0) {
@@ -47,16 +57,6 @@ struct WelcomeView: View {
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
                     .padding(.horizontal, 20)
 
-                    // MARK: Guest access
-                    Button {
-                        appState.guestAccess = true
-                        Task { await appState.fetchPOIs() }
-                    } label: {
-                        Text("Continuar sem conta")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .padding(.vertical, 20)
-                    }
                 }
                 .padding(.bottom, 40)
             }

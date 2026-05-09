@@ -2,6 +2,9 @@ import SwiftUI
 
 struct LayersPanelView: View {
     @ObservedObject var appState: AppState
+    @State private var showFurtoAlert    = false
+    @State private var showAcidenteAlert = false
+    @State private var showTypePicker    = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -43,8 +46,8 @@ struct LayersPanelView: View {
                         }
                     }
 
+                    Divider().padding(.top, 4)
                     sectionLabel("Pontos de Interesse", icon: "mappin.and.ellipse")
-                        .padding(.top, 6)
 
                     ForEach(POIType.allCases, id: \.rawValue) { type in
                         layerRow(key: type.rawValue, label: type.label,
@@ -61,6 +64,11 @@ struct LayersPanelView: View {
                         POIType.allCases.forEach   { appState.layerVisibility[$0.rawValue] = true }
                     }
                     Divider().padding(.leading, 48)
+                    actionRow("Limpar mapa", icon: "xmark.circle.fill", tint: .red) {
+                        InfraType.allCases.forEach { appState.layerVisibility[$0.rawValue] = false }
+                        POIType.allCases.forEach   { appState.layerVisibility[$0.rawValue] = false }
+                    }
+                    Divider().padding(.leading, 48)
                     actionRow("Ocultar tudo", icon: "eye.slash", tint: .secondary) {
                         InfraType.allCases.forEach { appState.layerVisibility[$0.rawValue] = false }
                         POIType.allCases.forEach   { appState.layerVisibility[$0.rawValue] = false }
@@ -68,11 +76,81 @@ struct LayersPanelView: View {
 
                     if appState.currentUserName != nil {
                         Divider().padding(.vertical, 8)
-                        actionRow("Adicionar ponto", icon: "plus.circle.fill", tint: .blue) {
-                            withAnimation(.spring(response: 0.35)) { appState.showSidebar = false }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                appState.mapPickingMode = .addPoint
+
+                        // Adicionar ponto — light blue button
+                        Button {
+                            showTypePicker = true
+                        } label: {
+                            Label("Adicionar ponto", systemImage: "plus.circle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.blue.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                        }
+                        .sheet(isPresented: $showTypePicker) {
+                            POITypePickerSheet { type in
+                                showTypePicker = false
+                                appState.pendingPOIType = type
+                                withAnimation(.spring(response: 0.35)) { appState.showSidebar = false }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    appState.mapPickingMode = .addPoint
+                                }
                             }
+                        }
+
+                        // Reportar Furto — red background, white text
+                        Button {
+                            showFurtoAlert = true
+                        } label: {
+                            Label("Reportar Furto", systemImage: "lock.open.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.red, in: RoundedRectangle(cornerRadius: 10))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                        }
+                        .alert("Reportar Furto de Bicicleta", isPresented: $showFurtoAlert) {
+                            Button("Cancelar", role: .cancel) { }
+                            Button("Confirmar", role: .destructive) {
+                                appState.pendingPOIType = .furto
+                                withAnimation(.spring(response: 0.35)) { appState.showSidebar = false }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                    appState.mapPickingMode = .addPoint
+                                }
+                            }
+                        } message: {
+                            Text("Isso irá alertar os membros da comunidade sobre o incidente. Lembre-se de registrar um boletim de ocorrência na polícia.")
+                        }
+
+                        // Reportar Acidente — light orange background, white text
+                        Button {
+                            showAcidenteAlert = true
+                        } label: {
+                            Label("Reportar Acidente", systemImage: "exclamationmark.triangle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.orange.opacity(0.7), in: RoundedRectangle(cornerRadius: 10))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                        }
+                        .alert("Reportar Acidente com Ciclista", isPresented: $showAcidenteAlert) {
+                            Button("Cancelar", role: .cancel) { }
+                            Button("Continuar", role: .destructive) {
+                                appState.pendingPOIType = .acidente_ferido
+                                withAnimation(.spring(response: 0.35)) { appState.showSidebar = false }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                    appState.mapPickingMode = .addPoint
+                                }
+                            }
+                        } message: {
+                            Text("Se houver feridos ou risco à segurança, entre em contato imediatamente com a polícia (190) ou solicite assistência médica (192/193) antes de registrar o ocorrido.")
                         }
                     }
 
@@ -87,25 +165,28 @@ struct LayersPanelView: View {
 
     // MARK: - Helpers
 
-    private func binding(for key: String) -> Binding<Bool> {
-        Binding(get: { appState.layerVisibility[key] ?? true },
-                set: { appState.layerVisibility[key] = $0 })
-    }
-
     private func layerRow<Icon: View>(key: String, label: String, tint: Color,
                                       @ViewBuilder icon: () -> Icon) -> some View {
-        Toggle(isOn: binding(for: key)) {
+        let isOn = appState.layerVisibility[key] ?? true
+        return Button {
+            appState.layerVisibility[key] = !isOn
+        } label: {
             HStack(spacing: 10) {
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(isOn ? tint : Color(.systemGray3))
                 icon()
                 Text(label)
                     .font(.subheadline)
-                    .foregroundStyle(.primary)
-                    .opacity((appState.layerVisibility[key] ?? true) ? 1.0 : 0.45)
+                    .foregroundStyle(Color.primary)
+                    .opacity(isOn ? 1.0 : 0.45)
+                Spacer()
             }
+            .contentShape(Rectangle())
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
         }
-        .toggleStyle(CheckboxToggleStyle(tint: tint))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .buttonStyle(.plain)
         .overlay(alignment: .bottom) {
             Divider().padding(.leading, 50)
         }
@@ -113,11 +194,11 @@ struct LayersPanelView: View {
 
     private func sectionLabel(_ text: String, icon: String) -> some View {
         Label(text, systemImage: icon)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(.primary)
             .padding(.horizontal, 14)
-            .padding(.top, 14)
-            .padding(.bottom, 4)
+            .padding(.top, 16)
+            .padding(.bottom, 6)
     }
 
     private func actionRow(_ title: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
@@ -143,20 +224,3 @@ struct LayersPanelView: View {
     }
 }
 
-// MARK: - Checkbox Toggle Style
-
-struct CheckboxToggleStyle: ToggleStyle {
-    let tint: Color
-
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: configuration.isOn ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 22))
-                .foregroundStyle(configuration.isOn ? tint : Color(.systemGray3))
-            configuration.label
-            Spacer()
-        }
-        .contentShape(Rectangle())
-        .onTapGesture { configuration.isOn.toggle() }
-    }
-}

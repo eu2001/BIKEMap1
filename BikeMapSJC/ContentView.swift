@@ -6,6 +6,7 @@ import Combine
 struct ContentView: View {
     @ObservedObject var appState: AppState
     @StateObject private var locationManager = LocationManager()
+    @State private var showContact = false
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -99,9 +100,23 @@ struct ContentView: View {
         .ignoresSafeArea(edges: .top)
         .sheet(isPresented: $appState.showRanking)      { RankingView(appState: appState) }
         .sheet(isPresented: $appState.showAuth)         { AuthView(appState: appState) }
-        .sheet(isPresented: $appState.showAddPoint)     { AddPointView(appState: appState) }
+        .sheet(isPresented: $appState.showAddPoint) {
+            if appState.pendingPOIType == .furto {
+                ReportFurtoView(appState: appState)
+            } else {
+                AddPointView(appState: appState)
+            }
+        }
         .sheet(item: $appState.selectedPOI)             { poi in POIDetailView(poi: poi, appState: appState) }
+        .sheet(isPresented: $showContact)               { ContactView() }
         .onReceive(locationManager.$authorizationStatus) { _ in }
+        // Open POI detail when user taps a push notification
+        .onChange(of: appState.notificationTargetPOI) { _, poi in
+            guard let poi else { return }
+            appState.shouldCenterOnUser = false
+            appState.selectedPOI = poi
+            appState.notificationTargetPOI = nil
+        }
     }
 
     // MARK: - Header bar
@@ -115,11 +130,17 @@ struct ContentView: View {
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
             }
 
-            Image("logo")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 38, height: 38)
-                .clipShape(Circle())
+            Button { showContact = true } label: {
+                Image("logo")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 38, height: 38)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(Color(.systemGray3), lineWidth: 2)
+                    )
+            }
 
             Spacer()
 
@@ -128,6 +149,11 @@ struct ContentView: View {
                     .font(.title3)
                     .frame(width: 38, height: 38)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        Circle()
+                            .stroke(Color.blue, lineWidth: 2)
+                            .padding(2)
+                    )
             }
 
             if let name = appState.currentUserName {
@@ -163,12 +189,6 @@ struct ContentView: View {
             mapButton(icon: "location.fill") {
                 locationManager.requestLocation()
                 appState.shouldCenterOnUser = true
-            }
-
-            if appState.currentUserName != nil {
-                mapButton(icon: "plus.circle.fill", tint: .blue) {
-                    appState.mapPickingMode = .addPoint
-                }
             }
         }
     }

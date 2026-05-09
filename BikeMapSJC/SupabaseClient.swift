@@ -24,6 +24,28 @@ struct ProfileRow: Codable {
     }
 }
 
+struct BikeRow: Codable, Identifiable, Hashable {
+    let id: UUID
+    var userId: UUID
+    var nickname: String
+    var brand: String
+    var color: String
+    var aro: String
+    var serialNumber: String
+    var details: String
+    var imageUrl: String?
+    var createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId       = "user_id"
+        case nickname, brand, color, aro, details
+        case serialNumber = "serial_number"
+        case imageUrl     = "image_url"
+        case createdAt    = "created_at"
+    }
+}
+
 struct POIRow: Codable, Identifiable {
     let id: String
     var type: String
@@ -33,16 +55,18 @@ struct POIRow: Codable, Identifiable {
     var description: String
     var authorUsername: String
     var authorId: UUID?
+    var createdAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, type, lat, lng, title, description
         case authorUsername = "author_username"
-        case authorId = "author_id"
+        case authorId       = "author_id"
+        case createdAt      = "created_at"
     }
 
     var asPOI: POI {
         POI(id: id, type: type, lat: lat, lng: lng,
             title: title, description: description,
-            author: authorUsername)
+            author: authorUsername, createdAt: createdAt)
     }
 }

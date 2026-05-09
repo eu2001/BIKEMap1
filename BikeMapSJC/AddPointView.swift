@@ -6,10 +6,19 @@ struct AddPointView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedType: POIType = .paraciclo
+
+    init(appState: AppState) {
+        self.appState = appState
+        _selectedType = State(initialValue: appState.pendingPOIType ?? .paraciclo)
+    }
     @State private var title       = ""
     @State private var description = ""
+    @State private var outOfBounds = false
 
     private var coordinate: CLLocationCoordinate2D? { appState.pendingAddCoordinate }
+
+    // Type is always pre-selected before AddPointView opens
+    private var generalTypes: [POIType] { POIType.allCases.filter { $0.canContribute && $0 != .furto && $0 != .acidente_ferido } }
 
     var body: some View {
         NavigationStack {
@@ -22,6 +31,11 @@ struct AddPointView: View {
                             Text(String(format: "%.5f, %.5f", coord.latitude, coord.longitude))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                        }
+                        if outOfBounds {
+                            Label(SJCBounds.outOfBoundsMessage, systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
                         }
                         // Mini map preview
                         Map(position: .constant(.region(MKCoordinateRegion(
@@ -41,17 +55,11 @@ struct AddPointView: View {
                 }
 
                 Section("Tipo de ponto") {
-                    Picker("Tipo", selection: $selectedType) {
-                        ForEach(POIType.allCases.filter(\.canContribute), id: \.rawValue) { type in
-                            Label {
-                                Text(type.label)
-                            } icon: {
-                                Text(type.emoji)
-                            }
-                            .tag(type)
-                        }
+                    Label {
+                        Text(selectedType.label).foregroundStyle(.primary)
+                    } icon: {
+                        Text(selectedType.emoji)
                     }
-                    .pickerStyle(.menu)
                 }
 
                 Section("Informações") {
@@ -71,7 +79,7 @@ struct AddPointView: View {
                         }
                         .frame(maxWidth: .infinity)
                     }
-                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || coordinate == nil)
+                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || coordinate == nil || outOfBounds)
                 }
             }
             .navigationTitle("Novo Ponto")
@@ -84,11 +92,17 @@ struct AddPointView: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .onChange(of: coordinate?.latitude) { _, _ in
+            if let coord = coordinate {
+                outOfBounds = !SJCBounds.contains(coord)
+            }
+        }
     }
 
     private func submit() {
         guard let coord = coordinate,
               !title.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard SJCBounds.contains(coord) else { outOfBounds = true; return }
         appState.addPOI(
             type: selectedType,
             coordinate: coord,
@@ -96,6 +110,7 @@ struct AddPointView: View {
             description: description.trimmingCharacters(in: .whitespaces)
         )
         appState.pendingAddCoordinate = nil
+        appState.pendingPOIType = nil
         dismiss()
     }
 }

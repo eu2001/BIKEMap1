@@ -2,6 +2,7 @@ import Foundation
 import MapKit
 import Combine
 import Supabase
+import UserNotifications
 
 class AppState: ObservableObject {
 
@@ -10,18 +11,28 @@ class AppState: ObservableObject {
     @Published var currentUserName: String?
     @Published var currentUserId: UUID?
     @Published var currentProfile: ProfileRow?
+    @Published var selectedBikeId: String? = UserDefaults.standard.string(forKey: "selectedBikeId") {
+        didSet { UserDefaults.standard.set(selectedBikeId, forKey: "selectedBikeId") }
+    }
+
+    var selectedBike: BikeRow? {
+        guard let id = selectedBikeId else { return nil }
+        return bikes.first { $0.id.uuidString == id }
+    }
 
     // MARK: - Data
 
-    @Published var pois: [POI] = []
+    @Published var pois:     [POI]     = []
+    @Published var bikes:    [BikeRow] = []
+    @Published var userPOIs: [POI]     = []
 
     // MARK: - Layer visibility
 
     @Published var layerVisibility: [String: Bool] = {
         var v: [String: Bool] = [:]
-        let defaultOnInfra: Set<InfraType> = [.ciclovia, .ciclofaixa]
+        let defaultOnInfra: Set<InfraType> = [.ciclovia, .ciclofaixa, .compartilhada]
         InfraType.allCases.forEach { v[$0.rawValue] = defaultOnInfra.contains($0) }
-        let defaultOnPOI: Set<POIType> = [.paraciclo, .bike_sharing]
+        let defaultOnPOI: Set<POIType> = [.paraciclo]
         POIType.allCases.forEach { v[$0.rawValue] = defaultOnPOI.contains($0) }
         return v
     }()
@@ -34,20 +45,50 @@ class AppState: ObservableObject {
     @Published var showRanking       = false
     @Published var showAuth          = false
     @Published var showAddPoint      = false
+    @Published var showReportFurto   = false
     @Published var selectedPOI: POI?
     @Published var mapPickingMode: MapPickingMode?
     @Published var pendingAddCoordinate: CLLocationCoordinate2D?
-    @Published var shouldCenterOnUser = false
+    @Published var pendingPOIType: POIType?
+    @Published var shouldCenterOnUser    = false
+    @Published var notificationTargetPOI: POI? = nil
 
     // MARK: - Toast
 
     @Published var toastMessage: String?
     private var toastTimer: Timer?
 
+    // MARK: - Realtime
+
+    private var realtimeTask: Task<Void, Never>?
+
     // MARK: - Init
 
     init() {
         Task { await restoreSession() }
+        startFurtoListener()
+    }
+
+    deinit { realtimeTask?.cancel() }
+
+    private func startFurtoListener() {
+        realtimeTask = Task {
+            let channel = supabase.channel("furto-alerts")
+            let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "pois")
+            await channel.subscribe()
+            for await change in changes {
+                guard case .insert(let action) = change else { continue }
+                let record = action.record
+                guard let type = record["type"]?.stringValue, type == "furto",
+                      let authorId = record["author_id"]?.stringValue else { continue }
+                // Don't notify the user who just reported it
+                await MainActor.run {
+                    if authorId != self.currentUserId?.uuidString {
+                        self.showToast("🔓 Novo roubo de bicicleta reportado na região! Fique atento.")
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Session restore
@@ -109,7 +150,10 @@ class AppState: ObservableObject {
                 self.currentUserId = nil
                 self.currentProfile = nil
                 self.guestAccess = false
-                self.pois = []
+                self.pois          = []
+                self.bikes         = []
+                self.userPOIs      = []
+                self.selectedBikeId = nil
                 showToast("Você saiu da conta. 👋")
             }
         }
@@ -136,6 +180,20 @@ class AppState: ObservableObject {
     }
 
     var currentUser: ProfileRow? { currentProfile }
+
+    func updateProfile(username: String, avatar: String) async throws {
+        guard let userId = currentUserId else { return }
+        try await supabase
+            .from("profiles")
+            .update(["username": username, "avatar": avatar])
+            .eq("id", value: userId)
+            .execute()
+        await MainActor.run {
+            self.currentProfile?.username = username
+            self.currentProfile?.avatar   = avatar
+            self.currentUserName          = username
+        }
+    }
 
     // MARK: - POIs
 
@@ -166,38 +224,194 @@ class AppState: ObservableObject {
         let id = "u_\(Int(Date().timeIntervalSince1970))"
         let newPOI = POI(id: id, type: type.rawValue,
                          lat: coordinate.latitude, lng: coordinate.longitude,
-                         title: title, description: description, author: userName)
+                         title: title, description: description, author: userName,
+                         createdAt: Date())
 
         Task {
             do {
                 struct InsertRow: Encodable {
-                    let id, type, title, description: String
+                    let id, type, title, description, status: String
                     let lat, lng: Double
                     let authorUsername: String
                     let authorId: UUID
                     enum CodingKeys: String, CodingKey {
-                        case id, type, title, description, lat, lng
+                        case id, type, title, description, status, lat, lng
                         case authorUsername = "author_username"
                         case authorId = "author_id"
                     }
                 }
+                // Furto reports start as "pending" — admin must approve before appearing on map
+                let status = type == .furto ? "pending" : "approved"
                 try await supabase.from("pois").insert(
                     InsertRow(id: id, type: type.rawValue, title: title,
-                              description: description, lat: coordinate.latitude,
-                              lng: coordinate.longitude, authorUsername: userName,
-                              authorId: userId)
+                              description: description, status: status,
+                              lat: coordinate.latitude, lng: coordinate.longitude,
+                              authorUsername: userName, authorId: userId)
                 ).execute()
 
                 await MainActor.run {
                     self.pois.append(newPOI)
                     // Optimistically bump count
                     self.currentProfile?.contributionCount += 1
-                    showToast("✅ Ponto adicionado! Obrigado pela contribuição.")
+                    showToast("✅ Ponto enviado! Será verificado pela equipe antes de aparecer no mapa.")
                 }
             } catch {
                 await MainActor.run {
                     showToast("❌ Erro ao salvar ponto. Tente novamente.")
                 }
+            }
+        }
+    }
+
+    // MARK: - User POIs
+
+    func fetchUserPOIs() async {
+        guard let userId = currentUserId else { return }
+        do {
+            let rows: [POIRow] = try await supabase
+                .from("pois")
+                .select()
+                .eq("author_id", value: userId)
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            await MainActor.run { self.userPOIs = rows.map(\.asPOI) }
+        } catch {
+            print("fetchUserPOIs error: \(error)")
+        }
+    }
+
+    // MARK: - Bikes
+
+    func fetchBikes() async {
+        guard let userId = currentUserId else { return }
+        do {
+            let rows: [BikeRow] = try await supabase
+                .from("bikes")
+                .select()
+                .eq("user_id", value: userId)
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            await MainActor.run { self.bikes = rows }
+        } catch {
+            print("fetchBikes error: \(error)")
+        }
+    }
+
+    func addBike(nickname: String, brand: String, color: String, aro: String,
+                 serialNumber: String, details: String, imageData: Data?) async throws {
+        guard let userId = currentUserId else { return }
+
+        var imageUrl: String? = nil
+        if let imageData { imageUrl = await uploadBikePhoto(imageData) }
+
+        struct InsertBike: Encodable {
+            let user_id: UUID
+            let nickname, brand, color, aro, serial_number, details: String
+            let image_url: String?
+        }
+        let inserted: BikeRow = try await supabase
+            .from("bikes")
+            .insert(InsertBike(user_id: userId, nickname: nickname, brand: brand,
+                               color: color, aro: aro, serial_number: serialNumber,
+                               details: details, image_url: imageUrl))
+            .select()
+            .single()
+            .execute()
+            .value
+        await MainActor.run { self.bikes.insert(inserted, at: 0) }
+    }
+
+    func updateBike(_ bike: BikeRow, imageData: Data?) async throws {
+        var imageUrl = bike.imageUrl
+        if let imageData { imageUrl = await uploadBikePhoto(imageData) }
+
+        struct UpdateBike: Encodable {
+            let nickname, brand, color, aro, serial_number, details: String
+            let image_url: String?
+        }
+        let updated: BikeRow = try await supabase
+            .from("bikes")
+            .update(UpdateBike(nickname: bike.nickname, brand: bike.brand,
+                               color: bike.color, aro: bike.aro,
+                               serial_number: bike.serialNumber,
+                               details: bike.details, image_url: imageUrl))
+            .eq("id", value: bike.id)
+            .select()
+            .single()
+            .execute()
+            .value
+        await MainActor.run {
+            if let idx = self.bikes.firstIndex(where: { $0.id == bike.id }) {
+                self.bikes[idx] = updated
+            }
+        }
+    }
+
+    func deleteBike(_ bike: BikeRow) async throws {
+        try await supabase.from("bikes").delete().eq("id", value: bike.id).execute()
+        await MainActor.run { self.bikes.removeAll { $0.id == bike.id } }
+    }
+
+    private func uploadBikePhoto(_ data: Data) async -> String? {
+        let fileName = "bike_\(Int(Date().timeIntervalSince1970)).jpg"
+        do {
+            try await supabase.storage
+                .from("bike-photos")
+                .upload(fileName, data: data, options: .init(contentType: "image/jpeg", upsert: false))
+            let url = try supabase.storage.from("bike-photos").getPublicURL(path: fileName)
+            return url.absoluteString
+        } catch {
+            print("uploadBikePhoto error: \(error)")
+            return nil
+        }
+    }
+
+    // MARK: - Photo Upload
+
+    func uploadFurtoPhoto(_ data: Data) async -> String? {
+        let fileName = "furto_\(Int(Date().timeIntervalSince1970)).jpg"
+        do {
+            try await supabase.storage
+                .from("furto-photos")
+                .upload(fileName, data: data, options: .init(contentType: "image/jpeg", upsert: false))
+            let url = try supabase.storage
+                .from("furto-photos")
+                .getPublicURL(path: fileName)
+            return url.absoluteString
+        } catch {
+            print("uploadFurtoPhoto error: \(error)")
+            return nil
+        }
+    }
+
+    // MARK: - Push Notifications
+
+    func requestPushPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            if granted {
+                DispatchQueue.main.async {
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
+            }
+        }
+    }
+
+    func savePushToken(_ token: String) {
+        Task {
+            do {
+                struct TokenRow: Encodable {
+                    let token: String
+                    let platform: String
+                }
+                try await supabase
+                    .from("push_tokens")
+                    .upsert(TokenRow(token: token, platform: "ios"),
+                            onConflict: "token")
+                    .execute()
+            } catch {
+                print("savePushToken error: \(error)")
             }
         }
     }

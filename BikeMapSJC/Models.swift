@@ -80,7 +80,7 @@ enum POIType: String, CaseIterable, Codable {
         case .bomba:           return "💨"
         case .chuveiro:        return "🚿"
         case .acidente_ferido: return "⚠️"
-        case .acidente_morte:  return "🔴"
+        case .acidente_morte:  return "❌"
         case .bike_sharing:    return "🚴‍♂️"
         case .furto:           return "🔓"
         }
@@ -89,7 +89,7 @@ enum POIType: String, CaseIterable, Codable {
     var label: String {
         switch self {
         case .paraciclo:       return "Paraciclo / Bicicletário"
-        case .bike_sharing:    return "Bike Compartilhada"
+        case .bike_sharing:    return "Estação de Bike Compartilhada"
         case .loja:            return "Loja de Bikes"
         case .reparo:          return "Pontos de Reparo"
         case .bomba:           return "Bombas de Ar"
@@ -118,7 +118,7 @@ enum POIType: String, CaseIterable, Codable {
 
     var canContribute: Bool {
         switch self {
-        case .paraciclo, .reparo, .bomba, .chuveiro, .furto: return true
+        case .paraciclo, .loja, .reparo, .bomba, .chuveiro, .furto, .acidente_ferido: return true
         default: return false
         }
     }
@@ -134,6 +134,7 @@ struct POI: Identifiable, Codable, Equatable {
     var title: String
     var description: String
     var author: String
+    var createdAt: Date?
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: lat, longitude: lng)
