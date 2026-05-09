@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidade — BikeMap SJC</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f6ff;
+      color: #1a1a2e;
+      line-height: 1.7;
+    }
+    header {
+      background: linear-gradient(135deg, #2563eb, #16a34a);
+      color: white;
+      padding: 48px 24px 40px;
+      text-align: center;
+    }
+    header img { width: 80px; border-radius: 18px; margin-bottom: 16px; }
+    header h1 { font-size: 2rem; font-weight: 700; }
+    header p  { opacity: 0.85; margin-top: 6px; font-size: 0.95rem; }
+    main {
+      max-width: 760px;
+      margin: 40px auto;
+      padding: 0 20px 60px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    }
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #2563eb;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    p { margin-bottom: 10px; color: #374151; }
+    ul { padding-left: 20px; color: #374151; }
+    ul li { margin-bottom: 6px; }
+    .badge {
+      font-size: 0.75rem;
+      background: #eff6ff;
+      color: #2563eb;
+      border-radius: 99px;
+      padding: 2px 10px;
+      font-weight: 600;
+      margin-left: auto;
+    }
+    .updated {
+      text-align: center;
+      font-size: 0.82rem;
+      color: #9ca3af;
+      margin-top: -8px;
+      margin-bottom: 32px;
+    }
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 0.82rem;
+      color: #6b7280;
+    }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🚲 BikeMap SJC</h1>
+  <p>Política de Privacidade</p>
+</header>
+
+<main>
+  <p class="updated">Última atualização: maio de 2026</p>
+
+  <div class="card">
+    <h2>📋 Visão Geral</h2>
+    <p>
+      O <strong>BikeMap SJC</strong> é um aplicativo gratuito de mapa cicloviário para São José dos Campos, SP.
+      Levamos a privacidade dos nossos usuários a sério. Esta política explica quais dados coletamos,
+      como os usamos e como os protegemos.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>📦 Dados que Coletamos <span class="badge">Mínimos</span></h2>
+    <ul>
+      <li><strong>Conta de usuário:</strong> e-mail e nome de usuário fornecidos no cadastro.</li>
+      <li><strong>Avatar:</strong> imagem de perfil selecionada dentre as opções do aplicativo.</li>
+      <li><strong>Pontos de interesse (POIs):</strong> localização, título e descrição enviados voluntariamente por você ao adicionar um ponto no mapa.</li>
+      <li><strong>Bicicletas registradas:</strong> apelido, marca, cor, aro e número de série fornecidos voluntariamente.</li>
+      <li><strong>Token de notificação (APNs):</strong> usado exclusivamente para enviar alertas de furto próximos a você. Não é compartilhado com terceiros.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>📍 Localização</h2>
+    <p>
+      O aplicativo solicita acesso à sua localização <strong>apenas enquanto em uso</strong>, para:
+    </p>
+    <ul>
+      <li>Centralizar o mapa na sua posição atual.</li>
+      <li>Preencher automaticamente as coordenadas ao reportar um furto ou adicionar um ponto.</li>
+    </ul>
+    <p>
+      Sua localização <strong>não é armazenada</strong> em nossos servidores, exceto quando você decide
+      submeter um ponto ou relatório de furto — nesse caso, a coordenada fica salva como parte do conteúdo que você criou.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>🔔 Notificações Push</h2>
+    <p>
+      Se você autorizar notificações, coletamos um token de dispositivo para enviar alertas quando
+      a comunidade reporta um furto de bicicleta. Você pode desativar as notificações a qualquer momento
+      nas configurações do seu dispositivo.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>🤝 Compartilhamento de Dados</h2>
+    <p>
+      <strong>Não vendemos, alugamos ou comercializamos seus dados pessoais.</strong>
+    </p>
+    <p>Utilizamos os seguintes serviços de terceiros, que possuem suas próprias políticas de privacidade:</p>
+    <ul>
+      <li><strong>Supabase</strong> — banco de dados e autenticação (supabase.com/privacy)</li>
+      <li><strong>Apple Maps / MapKit</strong> — exibição do mapa base (apple.com/legal/privacy)</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>🔒 Segurança</h2>
+    <p>
+      Todos os dados são transmitidos via HTTPS e armazenados em banco de dados com controle de
+      acesso por linha (Row-Level Security). Somente você pode editar ou excluir seus próprios dados.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>👦 Crianças</h2>
+    <p>
+      O aplicativo não é direcionado a crianças menores de 13 anos. Não coletamos intencionalmente
+      dados pessoais de crianças.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>✏️ Seus Direitos</h2>
+    <p>Você pode, a qualquer momento:</p>
+    <ul>
+      <li>Solicitar a exclusão da sua conta e todos os seus dados.</li>
+      <li>Corrigir informações incorretas no seu perfil.</li>
+      <li>Desativar notificações push nas configurações do iPhone.</li>
+    </ul>
+    <p>Para exercer esses direitos, entre em contato pelo e-mail abaixo.</p>
+  </div>
+
+  <div class="card">
+    <h2>📬 Contato</h2>
+    <p>
+      Dúvidas sobre esta política? Entre em contato:<br/>
+      <a href="mailto:eu2001@gmail.com">eu2001@gmail.com</a>
+    </p>
+    <p>
+      Desenvolvedor: Eric Sousa — São José dos Campos, SP, Brasil.
+    </p>
+  </div>
+</main>
+
+<footer>
+  &copy; 2026 BikeMap SJC. Todos os direitos reservados.
+</footer>
+
+</body>
+</html>
