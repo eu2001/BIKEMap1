@@ -16,11 +16,13 @@ struct ProfileRow: Codable {
     var avatar: String
     var contributionCount: Int
     var isPremium: Bool
+    var isAdmin: Bool
 
     enum CodingKeys: String, CodingKey {
         case id, username, avatar
         case contributionCount = "contribution_count"
         case isPremium = "is_premium"
+        case isAdmin   = "is_admin"
     }
 }
 

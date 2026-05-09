@@ -6,6 +6,7 @@ import Combine
 struct ContentView: View {
     @ObservedObject var appState: AppState
     @StateObject private var locationManager = LocationManager()
+    @StateObject private var network = NetworkMonitor()
     @State private var showContact = false
 
     var body: some View {
@@ -14,6 +15,9 @@ struct ContentView: View {
             // MARK: Map (full screen)
             BikeMapView(appState: appState)
                 .ignoresSafeArea()
+                .task {
+                    await appState.fetchInfraFeatures()
+                }
 
             // MARK: Picking mode banner
             if appState.mapPickingMode != nil {
@@ -23,6 +27,28 @@ struct ContentView: View {
             // MARK: Header
             header
                 .padding(.top, topSafeArea)
+
+            // MARK: Offline banner
+            if !network.isConnected {
+                VStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "wifi.slash")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Sem conexão — o mapa pode estar desatualizado")
+                            .font(.caption.weight(.medium))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.orange, ignoresSafeAreaEdges: [])
+                    Spacer()
+                }
+                .padding(.top, topSafeArea + 56)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.spring(response: 0.35), value: network.isConnected)
+                .zIndex(2)
+            }
 
             // MARK: Floating controls (right side)
             VStack {
@@ -189,6 +215,14 @@ struct ContentView: View {
             mapButton(icon: "location.fill") {
                 locationManager.requestLocation()
                 appState.shouldCenterOnUser = true
+            }
+
+            mapButton(icon: "plus.magnifyingglass") {
+                appState.zoomDelta = 1
+            }
+
+            mapButton(icon: "minus.magnifyingglass") {
+                appState.zoomDelta = -1
             }
         }
     }

@@ -31,6 +31,11 @@ struct BikeMapView: UIViewRepresentable {
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
         let c = context.coordinator
+        // Reload infra polylines if Supabase data just arrived
+        if !appState.infraFeatures.isEmpty && c.infraLoadedFromSupabase == false {
+            c.infraLoadedFromSupabase = true
+            c.reloadInfra(mapView: mapView)
+        }
         c.syncInfra(mapView: mapView, visibility: appState.layerVisibility)
         c.syncPOIs(mapView: mapView, pois: appState.pois, visibility: appState.layerVisibility)
 
@@ -39,6 +44,15 @@ struct BikeMapView: UIViewRepresentable {
                 mapView.setCenter(userCoord, animated: true)
             }
             DispatchQueue.main.async { self.appState.shouldCenterOnUser = false }
+        }
+
+        if appState.zoomDelta != 0 {
+            var region = mapView.region
+            let factor = appState.zoomDelta > 0 ? 0.5 : 2.0
+            region.span.latitudeDelta  = min(max(region.span.latitudeDelta  * factor, 0.002), 60)
+            region.span.longitudeDelta = min(max(region.span.longitudeDelta * factor, 0.002), 60)
+            mapView.setRegion(region, animated: true)
+            DispatchQueue.main.async { self.appState.zoomDelta = 0 }
         }
     }
 }
@@ -52,6 +66,7 @@ final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegat
     // Infra overlays, keyed by InfraType.rawValue
     private var infraPolylines: [String: [BikePolyline]] = [:]
     private var infraOnMap: Set<String> = []
+    var infraLoadedFromSupabase = false
 
     // POI annotations, keyed by poi.id
     private var poiAnnotations: [String: POIAnnotation] = [:]
@@ -60,8 +75,19 @@ final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegat
 
     // MARK: Setup
 
+    func reloadInfra(mapView: MKMapView) {
+        // Remove all existing infra overlays from the map
+        let toRemove = infraPolylines.values.flatMap { $0 }
+        mapView.removeOverlays(toRemove)
+        infraPolylines = [:]
+        infraOnMap = []
+        // Rebuild from Supabase data
+        setupInfra()
+    }
+
     func setupInfra() {
-        for feature in MapData.infraFeatures {
+        let features = appState.infraFeatures.isEmpty ? MapData.infraFeatures : appState.infraFeatures
+        for feature in features {
             let pl = BikePolyline(coordinates: feature.coordinates, count: feature.coordinates.count)
             pl.infraType = feature.type
             pl.featureName = feature.name
@@ -78,7 +104,7 @@ final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegat
     func syncInfra(mapView: MKMapView, visibility: [String: Bool]) {
         for type in InfraType.allCases {
             let key = type.rawValue
-            let shouldShow = visibility[key] ?? true
+            let shouldShow = visibility[key] ?? false
             let onMap = infraOnMap.contains(key)
             let polylines = infraPolylines[key] ?? []
 
@@ -100,7 +126,7 @@ final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegat
         let onMapIds = Set(mapView.annotations.compactMap { ($0 as? POIAnnotation)?.poi.id })
 
         for (poiId, ann) in poiAnnotations {
-            let shouldShow = visibility[ann.poi.type] ?? true
+            let shouldShow = visibility[ann.poi.type] ?? false
             let onMap = onMapIds.contains(poiId)
             if shouldShow && !onMap {
                 mapView.addAnnotation(ann)
@@ -179,8 +205,8 @@ final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegat
     // MARK: Emoji image helper
 
     private func makeEmojiImage(_ emoji: String, borderColor: UIColor = .systemRed) -> UIImage {
-        let size: CGFloat = 40
-        let borderWidth: CGFloat = 2.5
+        let size: CGFloat = 30
+        let borderWidth: CGFloat = 2.0
         let renderer = UIGraphicsImageRenderer(size: .init(width: size, height: size))
         return renderer.image { _ in
             let circle = UIBezierPath(ovalIn: .init(x: 0, y: 0, width: size, height: size))

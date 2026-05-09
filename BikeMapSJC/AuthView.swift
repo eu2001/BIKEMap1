@@ -4,11 +4,12 @@ import SwiftUI
 struct AuthView: View {
     @ObservedObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
-    @State private var showAddBike    = false
+    @State private var showAddBike     = false
     @State private var editingBike: BikeRow?
     @State private var deletingBike: BikeRow?
-    @State private var loadingBikes   = false
+    @State private var loadingBikes    = false
     @State private var showEditProfile = false
+    @State private var showAdmin       = false
 
     private var hasBikes: Bool { !appState.bikes.isEmpty }
 
@@ -144,6 +145,20 @@ struct AuthView: View {
                     }
                 }
 
+                // MARK: Admin panel (only for admins)
+                if appState.isAdmin {
+                    Section {
+                        Button {
+                            showAdmin = true
+                        } label: {
+                            Label("Painel do Administrador", systemImage: "shield.lefthalf.filled")
+                                .foregroundStyle(.purple)
+                        }
+                    } header: {
+                        Text("Administração")
+                    }
+                }
+
                 // MARK: Logout
                 Section {
                     Button(role: .destructive) {
@@ -175,6 +190,9 @@ struct AuthView: View {
             }
             .sheet(isPresented: $showEditProfile) {
                 EditProfileView(appState: appState)
+            }
+            .sheet(isPresented: $showAdmin) {
+                AdminView(appState: appState)
             }
             .alert("Remover bike?", isPresented: .init(
                 get: { deletingBike != nil },

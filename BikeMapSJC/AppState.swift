@@ -22,9 +22,10 @@ class AppState: ObservableObject {
 
     // MARK: - Data
 
-    @Published var pois:     [POI]     = []
-    @Published var bikes:    [BikeRow] = []
-    @Published var userPOIs: [POI]     = []
+    @Published var pois:           [POI]              = []
+    @Published var bikes:          [BikeRow]          = []
+    @Published var userPOIs:       [POI]              = []
+    @Published var infraFeatures:  [BikeInfraFeature] = []
 
     // MARK: - Layer visibility
 
@@ -52,6 +53,7 @@ class AppState: ObservableObject {
     @Published var pendingPOIType: POIType?
     @Published var shouldCenterOnUser    = false
     @Published var notificationTargetPOI: POI? = nil
+    @Published var zoomDelta: Double     = 0   // +1 = zoom in, -1 = zoom out
 
     // MARK: - Toast
 
@@ -202,6 +204,7 @@ class AppState: ObservableObject {
             let rows: [POIRow] = try await supabase
                 .from("pois")
                 .select()
+                .eq("status", value: "approved")
                 .execute()
                 .value
             await MainActor.run {
@@ -240,8 +243,8 @@ class AppState: ObservableObject {
                         case authorId = "author_id"
                     }
                 }
-                // Furto reports start as "pending" — admin must approve before appearing on map
-                let status = type == .furto ? "pending" : "approved"
+                // All user submissions start as "pending" — admin must approve before appearing on map
+                let status = "pending"
                 try await supabase.from("pois").insert(
                     InsertRow(id: id, type: type.rawValue, title: title,
                               description: description, status: status,
@@ -250,10 +253,22 @@ class AppState: ObservableObject {
                 ).execute()
 
                 await MainActor.run {
-                    self.pois.append(newPOI)
-                    // Optimistically bump count
-                    self.currentProfile?.contributionCount += 1
-                    showToast("✅ Ponto enviado! Será verificado pela equipe antes de aparecer no mapa.")
+                    showToast("✅ Ponto enviado! Será verificado pelo administrador antes de aparecer no mapa.")
+                }
+
+                // Notify admin immediately if this is a furto report
+                if type == .furto {
+                    try? await supabase.functions.invoke(
+                        "notify-admin-furto",
+                        options: .init(body: [
+                            "poi_id":          id,
+                            "title":           title,
+                            "description":     description,
+                            "lat":             String(coordinate.latitude),
+                            "lng":             String(coordinate.longitude),
+                            "author":          userName
+                        ])
+                    )
                 }
             } catch {
                 await MainActor.run {
@@ -386,6 +401,117 @@ class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Infrastructure Features
+
+    func fetchInfraFeatures() async {
+        do {
+            struct InfraRow: Decodable {
+                let name: String
+                let type: String
+                let coordinates: [[Double]]  // [[lng, lat], ...]
+                let extensionKm: String?
+                let reason: String?
+                let status: String?
+                let forecast: String?
+                enum CodingKeys: String, CodingKey {
+                    case name, type, coordinates
+                    case extensionKm  = "extension_km"
+                    case reason, status, forecast
+                }
+            }
+            let rows: [InfraRow] = try await supabase
+                .from("infra_features")
+                .select()
+                .execute()
+                .value
+
+            let features = rows.compactMap { row -> BikeInfraFeature? in
+                guard let infraType = InfraType(rawValue: row.type) else { return nil }
+                let coords = row.coordinates.map {
+                    CLLocationCoordinate2D(latitude: $0[1], longitude: $0[0])
+                }
+                return BikeInfraFeature(
+                    name: row.name, type: infraType,
+                    coordinates: coords,
+                    extensionKm: row.extensionKm,
+                    reason: row.reason,
+                    status: row.status,
+                    forecast: row.forecast
+                )
+            }
+            await MainActor.run {
+                self.infraFeatures = features
+            }
+        } catch {
+            // Fallback to hardcoded data if Supabase is unreachable
+            await MainActor.run {
+                if self.infraFeatures.isEmpty {
+                    self.infraFeatures = MapData.infraFeatures
+                }
+            }
+            print("fetchInfraFeatures error: \(error)")
+        }
+    }
+
+    // MARK: - Admin
+
+    var isAdmin: Bool { currentProfile?.isAdmin == true }
+
+    func fetchPendingPOIs() async -> [POI] {
+        do {
+            let rows: [POIRow] = try await supabase
+                .from("pois")
+                .select()
+                .eq("status", value: "pending")
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            return rows.map { $0.asPOI }
+        } catch {
+            print("fetchPendingPOIs error: \(error)")
+            return []
+        }
+    }
+
+    func approvePOI(_ poi: POI) async throws {
+        try await supabase
+            .from("pois")
+            .update(["status": "approved"])
+            .eq("id", value: poi.id)
+            .execute()
+        await MainActor.run {
+            if !self.pois.contains(where: { $0.id == poi.id }) {
+                self.pois.append(poi)
+            }
+            showToast("✅ Ponto aprovado e publicado no mapa.")
+        }
+
+        // Notify all users only after admin approves a furto
+        if poi.poiType == .furto {
+            try? await supabase.functions.invoke(
+                "notify-users-furto",
+                options: .init(body: [
+                    "poi_id":      poi.id,
+                    "title":       poi.title,
+                    "description": poi.description,
+                    "lat":         String(poi.lat),
+                    "lng":         String(poi.lng)
+                ])
+            )
+        }
+    }
+
+    func rejectPOI(_ poi: POI) async throws {
+        try await supabase
+            .from("pois")
+            .update(["status": "rejected"])
+            .eq("id", value: poi.id)
+            .execute()
+        await MainActor.run {
+            showToast("🗑️ Ponto rejeitado.")
+        }
+    }
+
     // MARK: - Push Notifications
 
     func requestPushPermission() {
@@ -404,10 +530,15 @@ class AppState: ObservableObject {
                 struct TokenRow: Encodable {
                     let token: String
                     let platform: String
+                    let userId: UUID?
+                    enum CodingKeys: String, CodingKey {
+                        case token, platform
+                        case userId = "user_id"
+                    }
                 }
                 try await supabase
                     .from("push_tokens")
-                    .upsert(TokenRow(token: token, platform: "ios"),
+                    .upsert(TokenRow(token: token, platform: "ios", userId: currentUserId),
                             onConflict: "token")
                     .execute()
             } catch {

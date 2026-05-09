@@ -210,7 +210,7 @@ struct ReportFurtoView: View {
                         Task { await submit() }
                     }
                 } message: {
-                    Text("Ao confirmar, todos os membros da comunidade BikeMap serão notificados sobre este roubo de bicicleta na região.")
+                    Text("Se o furto ocorreu há menos de 24h, todos os membros da comunidade BikeMap serão notificados sobre este roubo de bicicleta na região.")
                 }
             }
             .navigationTitle("Reportar Furto")

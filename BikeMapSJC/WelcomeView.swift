@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WelcomeView: View {
     @ObservedObject var appState: AppState
+    @StateObject private var network = NetworkMonitor()
 
     @State private var tab: WelcomeTab = .login
 
@@ -59,6 +60,26 @@ struct WelcomeView: View {
 
                 }
                 .padding(.bottom, 40)
+            }
+
+            // Offline banner
+            if !network.isConnected {
+                VStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "wifi.slash")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Sem conexão com a internet")
+                            .font(.caption.weight(.medium))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.orange, ignoresSafeAreaEdges: [])
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.spring(response: 0.35), value: network.isConnected)
             }
         }
     }
@@ -146,14 +167,15 @@ private struct WelcomeLoginForm: View {
 private struct WelcomeRegisterForm: View {
     @ObservedObject var appState: AppState
 
-    @State private var username = ""
-    @State private var email    = ""
-    @State private var password = ""
-    @State private var confirm  = ""
-    @State private var avatar   = "capivara"
-    @State private var error    = ""
-    @State private var loading  = false
-    @State private var showPw   = false
+    @State private var username    = ""
+    @State private var email       = ""
+    @State private var password    = ""
+    @State private var confirm     = ""
+    @State private var avatar      = "capivara"
+    @State private var error       = ""
+    @State private var loading     = false
+    @State private var showPw      = false
+    @State private var showConfirm = false
 
     var body: some View {
         VStack(spacing: 14) {
@@ -182,10 +204,23 @@ private struct WelcomeRegisterForm: View {
                     }
                 }
                 Divider().padding(.leading, 16)
-                SecureField("Confirmar senha", text: $confirm)
+                HStack {
+                    Group {
+                        if showConfirm {
+                            TextField("Confirmar senha", text: $confirm)
+                        } else {
+                            SecureField("Confirmar senha", text: $confirm)
+                        }
+                    }
                     .textContentType(.newPassword)
-                    .padding(.horizontal, 16)
+                    .padding(.leading, 16)
                     .frame(height: 44)
+                    Button { showConfirm.toggle() } label: {
+                        Image(systemName: showConfirm ? "eye.slash" : "eye")
+                            .foregroundStyle(.secondary)
+                            .padding(.trailing, 16)
+                    }
+                }
             }
 
             // Avatar picker

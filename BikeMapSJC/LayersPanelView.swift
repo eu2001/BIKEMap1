@@ -167,7 +167,7 @@ struct LayersPanelView: View {
 
     private func layerRow<Icon: View>(key: String, label: String, tint: Color,
                                       @ViewBuilder icon: () -> Icon) -> some View {
-        let isOn = appState.layerVisibility[key] ?? true
+        let isOn = appState.layerVisibility[key] ?? false
         return Button {
             appState.layerVisibility[key] = !isOn
         } label: {
