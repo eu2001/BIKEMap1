@@ -197,6 +197,14 @@ class AppState: ObservableObject {
         }
     }
 
+    func resetPassword(email: String) async throws {
+        try await supabase.auth.resetPasswordForEmail(email)
+    }
+
+    func changePassword(newPassword: String) async throws {
+        try await supabase.auth.update(user: UserAttributes(password: newPassword))
+    }
+
     // MARK: - POIs
 
     func fetchPOIs() async {
