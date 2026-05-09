@@ -18,12 +18,13 @@ struct WelcomeView: View {
                 VStack(spacing: 0) {
 
                     // MARK: Branding
-                    Image("logo")
+                    Image("capivara")
                         .resizable()
-                        .scaledToFit()
-                        .frame(width: 180, height: 180)
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
-                        .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 4)
+                        .scaledToFill()
+                        .frame(width: 160, height: 160)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white.opacity(0.6), lineWidth: 4))
+                        .shadow(color: .black.opacity(0.22), radius: 16, x: 0, y: 6)
                         .padding(.top, 56)
                         .padding(.bottom, 16)
 
