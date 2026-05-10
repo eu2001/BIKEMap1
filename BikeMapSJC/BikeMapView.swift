@@ -100,8 +100,10 @@ final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegat
         manager.stopUpdatingLocation()
         DispatchQueue.main.async { [weak self] in
             guard let mv = self?.mapView else { return }
+            // ~100 m de raio ao redor do usuário (região de 200 m × 200 m)
             let region = MKCoordinateRegion(center: loc.coordinate,
-                                            span: .init(latitudeDelta: 0.04, longitudeDelta: 0.04))
+                                            latitudinalMeters: 200,
+                                            longitudinalMeters: 200)
             mv.setRegion(region, animated: true)
         }
     }
@@ -114,8 +116,10 @@ final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegat
     func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
         guard !didCenterOnUser, let loc = userLocation.location else { return }
         didCenterOnUser = true
+        // ~100 m de raio ao redor do usuário (região de 200 m × 200 m)
         let region = MKCoordinateRegion(center: loc.coordinate,
-                                        span: .init(latitudeDelta: 0.04, longitudeDelta: 0.04))
+                                        latitudinalMeters: 200,
+                                        longitudinalMeters: 200)
         mapView.setRegion(region, animated: true)
     }
 

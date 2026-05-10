@@ -101,15 +101,20 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 // MARK: - Splash Screen
 
 struct SplashView: View {
+    @State private var pulse = false
+
     var body: some View {
         ZStack {
             Color.white
                 .ignoresSafeArea()
 
-            GIFView(name: "welcome")
-                .frame(width: 360, height: 360)
-                .clipShape(RoundedRectangle(cornerRadius: 36))
-                .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 6)
+            Image("logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 240, height: 240)
+                .opacity(pulse ? 1.0 : 0.35)
+                .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: pulse)
+                .onAppear { pulse = true }
         }
     }
 }
