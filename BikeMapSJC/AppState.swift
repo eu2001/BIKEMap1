@@ -26,6 +26,9 @@ class AppState: ObservableObject {
     @Published var bikes:          [BikeRow]          = []
     @Published var userPOIs:       [POI]              = []
     @Published var infraFeatures:  [BikeInfraFeature] = []
+    @Published var notifications:  [NotificationRow]  = []
+
+    var unreadNotificationCount: Int { notifications.filter { !$0.isRead }.count }
 
     // MARK: - Layer visibility
 
@@ -63,6 +66,7 @@ class AppState: ObservableObject {
     // MARK: - Realtime
 
     private var realtimeTask: Task<Void, Never>?
+    private var notificationsTask: Task<Void, Never>?
 
     // MARK: - Init
 
@@ -71,7 +75,10 @@ class AppState: ObservableObject {
         startFurtoListener()
     }
 
-    deinit { realtimeTask?.cancel() }
+    deinit {
+        realtimeTask?.cancel()
+        notificationsTask?.cancel()
+    }
 
     private func startFurtoListener() {
         realtimeTask = Task {
@@ -102,6 +109,8 @@ class AppState: ObservableObject {
                 self.currentUserId = session.user.id
             }
             await fetchProfile(userId: session.user.id)
+            await fetchNotifications()
+            startNotificationsListener()
         } catch {
             // No active session — show welcome screen
         }
@@ -142,11 +151,15 @@ class AppState: ObservableObject {
         await MainActor.run { self.currentUserId = session.user.id }
         await fetchProfile(userId: session.user.id)
         await fetchPOIs()
+        await fetchNotifications()
+        startNotificationsListener()
     }
 
     func logout() {
         Task {
             try? await supabase.auth.signOut()
+            notificationsTask?.cancel()
+            notificationsTask = nil
             await MainActor.run {
                 self.currentUserName = nil
                 self.currentUserId = nil
@@ -155,6 +168,7 @@ class AppState: ObservableObject {
                 self.pois          = []
                 self.bikes         = []
                 self.userPOIs      = []
+                self.notifications = []
                 self.selectedBikeId = nil
                 showToast("Você saiu da conta. 👋")
             }
@@ -474,11 +488,15 @@ class AppState: ObservableObject {
     }
 
     func approvePOI(_ poi: POI) async throws {
-        try await supabase
+        struct ApprovedRow: Decodable { let authorId: UUID?; enum CodingKeys: String, CodingKey { case authorId = "author_id" } }
+        let updated: ApprovedRow = try await supabase
             .from("pois")
             .update(["status": "approved"])
             .eq("id", value: poi.id)
+            .select("author_id")
+            .single()
             .execute()
+            .value
         await MainActor.run {
             if !self.pois.contains(where: { $0.id == poi.id }) {
                 self.pois.append(poi)
@@ -486,19 +504,21 @@ class AppState: ObservableObject {
             showToast("✅ Ponto aprovado e publicado no mapa.")
         }
 
-        // Notify all users only after admin approves a furto
-        if poi.poiType == .furto {
-            try? await supabase.functions.invoke(
-                "notify-users-furto",
-                options: .init(body: [
-                    "poi_id":      poi.id,
-                    "title":       poi.title,
-                    "description": poi.description,
-                    "lat":         String(poi.lat),
-                    "lng":         String(poi.lng)
-                ])
-            )
+        var body: [String: String] = [
+            "poi_id":      poi.id,
+            "poi_type":    poi.type,
+            "title":       poi.title,
+            "description": poi.description,
+            "lat":         String(poi.lat),
+            "lng":         String(poi.lng),
+        ]
+        if let authorId = updated.authorId {
+            body["author_id"] = authorId.uuidString
         }
+        try? await supabase.functions.invoke(
+            "notify-poi-approved",
+            options: .init(body: body)
+        )
     }
 
     func rejectPOI(_ poi: POI) async throws {
@@ -510,6 +530,83 @@ class AppState: ObservableObject {
         await MainActor.run {
             showToast("🗑️ Ponto rejeitado.")
         }
+    }
+
+    // MARK: - In-app Notifications
+
+    func fetchNotifications() async {
+        guard let userId = currentUserId else { return }
+        do {
+            let rows: [NotificationRow] = try await supabase
+                .from("notifications")
+                .select()
+                .eq("user_id", value: userId)
+                .order("created_at", ascending: false)
+                .limit(100)
+                .execute()
+                .value
+            await MainActor.run { self.notifications = rows }
+        } catch {
+            print("fetchNotifications error: \(error)")
+        }
+    }
+
+    func markNotificationRead(_ notification: NotificationRow) async {
+        guard notification.readAt == nil else { return }
+        let now = Date()
+        await MainActor.run {
+            if let idx = self.notifications.firstIndex(where: { $0.id == notification.id }) {
+                self.notifications[idx].readAt = now
+            }
+        }
+        do {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            try await supabase
+                .from("notifications")
+                .update(["read_at": formatter.string(from: now)])
+                .eq("id", value: notification.id)
+                .execute()
+        } catch {
+            print("markNotificationRead error: \(error)")
+        }
+    }
+
+    func markAllNotificationsRead() async {
+        let unread = await MainActor.run { self.notifications.filter { !$0.isRead } }
+        for n in unread {
+            await markNotificationRead(n)
+        }
+    }
+
+    private func startNotificationsListener() {
+        notificationsTask?.cancel()
+        guard currentUserId != nil else { return }
+        notificationsTask = Task { [weak self] in
+            let channel = supabase.channel("notifications-stream")
+            let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "notifications")
+            await channel.subscribe()
+            for await change in changes {
+                guard let self else { return }
+                if case .insert = change {
+                    await self.fetchNotifications()
+                }
+            }
+        }
+    }
+
+    func openNotification(_ notification: NotificationRow) {
+        Task { await markNotificationRead(notification) }
+        guard let poiId = notification.poiId,
+              let lat = notification.lat,
+              let lng = notification.lng else { return }
+        let poiType = notification.poiType ?? POIType.furto.rawValue
+        let poi = POI(id: poiId, type: poiType,
+                      lat: lat, lng: lng,
+                      title: notification.title,
+                      description: notification.body ?? "",
+                      author: "", createdAt: notification.createdAt)
+        notificationTargetPOI = poi
     }
 
     // MARK: - Push Notifications

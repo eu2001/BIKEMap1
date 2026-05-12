@@ -187,7 +187,16 @@ struct ContentView: View {
                     AvatarView(id: appState.currentUser?.avatar ?? "capivara", size: 38)
                 }
                 .overlay(alignment: .topTrailing) {
-                    if appState.currentUser?.isPremium == true {
+                    if appState.unreadNotificationCount > 0 {
+                        Text("\(appState.unreadNotificationCount)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(minWidth: 16, minHeight: 16)
+                            .padding(.horizontal, 3)
+                            .background(Color.red, in: Capsule())
+                            .overlay(Capsule().stroke(Color.white, lineWidth: 1.5))
+                            .offset(x: 6, y: -6)
+                    } else if appState.currentUser?.isPremium == true {
                         Text("⭐").font(.system(size: 10)).offset(x: 4, y: -4)
                     }
                 }

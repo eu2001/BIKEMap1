@@ -72,3 +72,28 @@ struct POIRow: Codable, Identifiable {
             author: authorUsername, createdAt: createdAt)
     }
 }
+
+struct NotificationRow: Codable, Identifiable, Hashable {
+    let id: UUID
+    var userId: UUID
+    var type: String
+    var poiId: String?
+    var poiType: String?
+    var title: String
+    var body: String?
+    var lat: Double?
+    var lng: Double?
+    var readAt: Date?
+    var createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, title, body, lat, lng
+        case userId    = "user_id"
+        case poiId     = "poi_id"
+        case poiType   = "poi_type"
+        case readAt    = "read_at"
+        case createdAt = "created_at"
+    }
+
+    var isRead: Bool { readAt != nil }
+}

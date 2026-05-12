@@ -17,6 +17,31 @@ struct AuthView: View {
         NavigationStack {
             List {
 
+                // MARK: Notifications
+                if !appState.notifications.isEmpty {
+                    Section {
+                        ForEach(appState.notifications) { notification in
+                            notificationRow(notification)
+                        }
+                    } header: {
+                        HStack {
+                            Text("Notificações")
+                            if appState.unreadNotificationCount > 0 {
+                                Text("(\(appState.unreadNotificationCount) novas)")
+                                    .foregroundStyle(.red)
+                            }
+                            Spacer()
+                            if appState.unreadNotificationCount > 0 {
+                                Button("Marcar como lidas") {
+                                    Task { await appState.markAllNotificationsRead() }
+                                }
+                                .font(.caption)
+                                .textCase(nil)
+                            }
+                        }
+                    }
+                }
+
                 // MARK: Profile header
                 if let profile = appState.currentProfile {
                     Section {
@@ -180,6 +205,7 @@ struct AuthView: View {
                 loadingBikes = true
                 await appState.fetchBikes()
                 await appState.fetchUserPOIs()
+                await appState.fetchNotifications()
                 loadingBikes = false
             }
             .sheet(isPresented: $showAddBike) {
@@ -211,6 +237,53 @@ struct AuthView: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+
+    // MARK: - Notification row
+
+    private func notificationRow(_ notification: NotificationRow) -> some View {
+        Button {
+            appState.openNotification(notification)
+            dismiss()
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: notification.type == "furto_alert" ? "exclamationmark.triangle.fill" : "checkmark.seal.fill")
+                    .font(.title3)
+                    .foregroundStyle(notification.type == "furto_alert" ? .red : .green)
+                    .frame(width: 32, height: 32)
+                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(notification.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        if !notification.isRead {
+                            Circle().fill(Color.red).frame(width: 8, height: 8)
+                        }
+                    }
+                    if let body = notification.body, !body.isEmpty {
+                        Text(body)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    if let date = notification.createdAt {
+                        Text(date.formatted(.relative(presentation: .named)))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                Spacer()
+                if notification.poiId != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Bike row
