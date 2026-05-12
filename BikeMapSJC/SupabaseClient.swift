@@ -4,8 +4,8 @@ import Supabase
 // MARK: - Shared client
 
 let supabase = SupabaseClient(
-    supabaseURL: URL(string: "https://rwhwngayniazpruukblm.supabase.co")!,
-    supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3aHduZ2F5bmlhenBydXVrYmxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNDc5MDYsImV4cCI6MjA5MzgyMzkwNn0.ZxJKC-Qfpp9R7mw1tPxEkVYesFA2EgWgJOwJysplxX0"
+    supabaseURL: URL(string: "https://hobulqkujiczaakaucwz.supabase.co")!,
+    supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvYnVscWt1amljemFha2F1Y3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MzkzMDYsImV4cCI6MjA5NDExNTMwNn0.PNNEuLEhLK-H_SthDloN5yJcw_Z1SYTUVxQ6NlfEgcU"
 )
 
 // MARK: - Database row types

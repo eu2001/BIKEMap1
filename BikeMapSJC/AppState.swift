@@ -129,7 +129,7 @@ class AppState: ObservableObject {
             let error: String?
         }
 
-        let url = URL(string: "https://rwhwngayniazpruukblm.supabase.co/functions/v1/register-user")!
+        let url = URL(string: "https://hobulqkujiczaakaucwz.supabase.co/functions/v1/register-user")!
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
