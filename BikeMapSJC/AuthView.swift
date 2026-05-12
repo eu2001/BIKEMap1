@@ -99,6 +99,21 @@ struct AuthView: View {
                     }
                 }
 
+                // MARK: Admin panel (only for admins) — surfaced first so admins
+                // can reach the review queue right after their name/avatar.
+                if appState.isAdmin {
+                    Section {
+                        Button {
+                            showAdmin = true
+                        } label: {
+                            Label("Painel do Administrador", systemImage: "shield.lefthalf.filled")
+                                .foregroundStyle(.purple)
+                        }
+                    } header: {
+                        Text("Administração")
+                    }
+                }
+
                 // MARK: Minhas Bikes
                 Section {
                     if !hasBikes {
@@ -167,20 +182,6 @@ struct AuthView: View {
                             Spacer()
                         }
                         .padding(.vertical, 2)
-                    }
-                }
-
-                // MARK: Admin panel (only for admins)
-                if appState.isAdmin {
-                    Section {
-                        Button {
-                            showAdmin = true
-                        } label: {
-                            Label("Painel do Administrador", systemImage: "shield.lefthalf.filled")
-                                .foregroundStyle(.purple)
-                        }
-                    } header: {
-                        Text("Administração")
                     }
                 }
 
