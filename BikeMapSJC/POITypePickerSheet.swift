@@ -13,14 +13,14 @@ struct POITypePickerSheet: View {
         NavigationStack {
             List {
                 Section {
-                    Text("Selecione o tipo de ponto que deseja adicionar ao mapa. Em seguida, toque na localização exata no mapa.")
+                    Text("Pick the type of point you want to add to the map, then tap the exact spot on the map.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 4)
                         .listRowBackground(Color.clear)
                 }
 
-                Section("Tipo de ponto") {
+                Section("Point type") {
                     ForEach(types, id: \.rawValue) { type in
                         Button {
                             onSelect(type)
@@ -50,11 +50,11 @@ struct POITypePickerSheet: View {
                     }
                 }
             }
-            .navigationTitle("Adicionar ponto")
+            .navigationTitle("Add point")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }

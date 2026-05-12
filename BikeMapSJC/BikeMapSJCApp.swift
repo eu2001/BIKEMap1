@@ -83,7 +83,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         if let latStr = info["lat"] as? String, let lngStr = info["lng"] as? String,
            let lat = Double(latStr), let lng = Double(lngStr) {
             let coord = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-            let title = info["poi_title"] as? String ?? "Furto de Bicicleta"
+            let title = info["poi_title"] as? String ?? "Bike Theft"
             let desc  = info["poi_description"] as? String ?? ""
             let poiId = info["poi_id"] as? String ?? ""
             let poi   = POI(id: poiId, type: POIType.furto.rawValue,

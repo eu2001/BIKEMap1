@@ -44,12 +44,12 @@ enum InfraType: String, CaseIterable, Codable {
 
     var label: String {
         switch self {
-        case .ciclovia:         return "Ciclovia"
-        case .ciclofaixa:       return "Ciclofaixa"
-        case .compartilhada:    return "Via Compartilhada"
-        case .rota_alternativa: return "Rota Alternativa"
-        case .proibida:         return "Via Proibida"
-        case .planejada:        return "Planejada / Em Obras"
+        case .ciclovia:         return "Protected Bike Lane"
+        case .ciclofaixa:       return "Bike Lane"
+        case .compartilhada:    return "Shared Roadway"
+        case .rota_alternativa: return "Alternative Route"
+        case .proibida:         return "No Cycling Allowed"
+        case .planejada:        return "Planned / Under Construction"
         }
     }
 }
@@ -90,16 +90,16 @@ enum POIType: String, CaseIterable, Codable {
 
     var label: String {
         switch self {
-        case .paraciclo:       return "Paraciclo / Bicicletário"
-        case .bike_sharing:    return "Estação de Bike Compartilhada"
-        case .loja:            return "Loja de Bikes"
-        case .reparo:          return "Pontos de Reparo"
-        case .bomba:           return "Bombas de Ar"
-        case .chuveiro:        return "Chuveiro / Vestiário"
-        case .furto:           return "Furtos de Bicicleta"
-        case .acidente_ferido: return "Acidentes com Ciclistas"
-        case .acidente_morte:  return "Acidentes Fatais"
-        case .restroom:        return "Banheiro Público"
+        case .paraciclo:       return "Bike Rack"
+        case .bike_sharing:    return "Bikeshare Station"
+        case .loja:            return "Bike Shop"
+        case .reparo:          return "Fix-It Stand"
+        case .bomba:           return "Air Pump"
+        case .chuveiro:        return "Shower / Locker Room"
+        case .furto:           return "Stolen Bikes"
+        case .acidente_ferido: return "Cyclist Crashes"
+        case .acidente_morte:  return "Fatal Crashes"
+        case .restroom:        return "Public Restroom"
         }
     }
 
@@ -194,9 +194,9 @@ struct AvatarView: View {
 }
 
 let avatarList: [(id: String, name: String)] = [
-    ("tucano",   "Tucano"),
-    ("capivara", "Capivara"),
+    ("tucano",   "Toucan"),
+    ("capivara", "Capybara"),
     ("muiriqui", "Muriqui"),
-    ("preguica", "Preguiça"),
-    ("gamba",    "Gambá")
+    ("preguica", "Sloth"),
+    ("gamba",    "Opossum")
 ]

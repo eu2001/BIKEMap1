@@ -93,7 +93,7 @@ class AppState: ObservableObject {
                 // Don't notify the user who just reported it
                 await MainActor.run {
                     if authorId != self.currentUserId?.uuidString {
-                        self.showToast("🔓 Novo roubo de bicicleta reportado na região! Fique atento.")
+                        self.showToast("🔓 New bike theft reported nearby! Stay alert.")
                     }
                 }
             }
@@ -138,12 +138,12 @@ class AppState: ObservableObject {
         let (data, resp) = try await URLSession.shared.data(for: req)
         if let httpResp = resp as? HTTPURLResponse, httpResp.statusCode != 201 {
             let body = try JSONDecoder().decode(RegisterResponse.self, from: data)
-            throw AppError.message(body.error ?? "Erro ao criar conta.")
+            throw AppError.message(body.error ?? "Error creating account.")
         }
 
         // Now sign in
         try await signIn(email: email, password: password)
-        await MainActor.run { showToast("🎉 Conta criada! Bem-vindo(a), \(username)!") }
+        await MainActor.run { showToast("🎉 Account created! Welcome, \(username)!") }
     }
 
     func signIn(email: String, password: String) async throws {
@@ -170,7 +170,7 @@ class AppState: ObservableObject {
                 self.userPOIs      = []
                 self.notifications = []
                 self.selectedBikeId = nil
-                showToast("Você saiu da conta. 👋")
+                showToast("You've been signed out. 👋")
             }
         }
     }
@@ -267,7 +267,7 @@ class AppState: ObservableObject {
                 ).execute()
 
                 await MainActor.run {
-                    showToast("✅ Ponto enviado! Será verificado pelo administrador antes de aparecer no mapa.")
+                    showToast("✅ Point submitted! It will be reviewed by an admin before appearing on the map.")
                 }
 
                 // Notify admin immediately if this is a furto report
@@ -286,7 +286,7 @@ class AppState: ObservableObject {
                 }
             } catch {
                 await MainActor.run {
-                    showToast("❌ Erro ao salvar ponto. Tente novamente.")
+                    showToast("❌ Error saving point. Try again.")
                 }
             }
         }
@@ -501,7 +501,7 @@ class AppState: ObservableObject {
             if !self.pois.contains(where: { $0.id == poi.id }) {
                 self.pois.append(poi)
             }
-            showToast("✅ Ponto aprovado e publicado no mapa.")
+            showToast("✅ Point approved and published on the map.")
         }
 
         var body: [String: String] = [
@@ -528,7 +528,7 @@ class AppState: ObservableObject {
             .eq("id", value: poi.id)
             .execute()
         await MainActor.run {
-            showToast("🗑️ Ponto rejeitado.")
+            showToast("🗑️ Point rejected.")
         }
     }
 

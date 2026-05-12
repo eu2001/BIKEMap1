@@ -34,7 +34,7 @@ struct ContentView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "wifi.slash")
                             .font(.subheadline.weight(.semibold))
-                        Text("Sem conexão — o mapa pode estar desatualizado")
+                        Text("Offline — the map may be out of date")
                             .font(.caption.weight(.medium))
                     }
                     .foregroundStyle(.white)
@@ -203,7 +203,7 @@ struct ContentView: View {
                 let _ = name  // suppress warning
             } else {
                 Button { appState.showAuth = true } label: {
-                    Text("Entrar")
+                    Text("Sign in")
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .padding(.horizontal, 12)
@@ -256,7 +256,7 @@ struct ContentView: View {
                 Image(systemName: "hand.tap.fill").foregroundStyle(.white)
                 Text(pickingModeLabel).foregroundStyle(.white).font(.subheadline).fontWeight(.medium)
                 Spacer()
-                Button("Cancelar") {
+                Button("Cancel") {
                     appState.mapPickingMode = nil
                 }
                 .foregroundStyle(.white.opacity(0.85))
@@ -274,7 +274,7 @@ struct ContentView: View {
 
     private var pickingModeLabel: String {
         switch appState.mapPickingMode {
-        case .addPoint: return "Toque no mapa para adicionar um ponto"
+        case .addPoint: return "Tap the map to add a point"
         case .none:     return ""
         }
     }
@@ -308,7 +308,7 @@ struct LegendView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Legenda").font(.headline)
+                Text("Legend").font(.headline)
                 Spacer()
                 Button { withAnimation { appState.showLegend = false } } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
@@ -316,7 +316,7 @@ struct LegendView: View {
             }
             .padding(.bottom, 4)
 
-            Text("Infraestrutura").font(.caption).foregroundStyle(.secondary).fontWeight(.semibold)
+            Text("Infrastructure").font(.caption).foregroundStyle(.secondary).fontWeight(.semibold)
             ForEach(InfraType.allCases, id: \.rawValue) { type in
                 HStack(spacing: 8) {
                     legendLine(color: type.color, dashed: type.dashPattern != nil)
@@ -326,7 +326,7 @@ struct LegendView: View {
 
             Divider().padding(.vertical, 4)
 
-            Text("Pontos de Interesse").font(.caption).foregroundStyle(.secondary).fontWeight(.semibold)
+            Text("Points of Interest").font(.caption).foregroundStyle(.secondary).fontWeight(.semibold)
             let poiRows = POIType.allCases.chunked(into: 2)
             ForEach(0..<poiRows.count, id: \.self) { row in
                 HStack(spacing: 12) {
@@ -380,12 +380,12 @@ struct POIDetailView: View {
                 }
 
                 if !poi.description.isEmpty {
-                    Section("Descrição") {
+                    Section("Description") {
                         Text(poi.description)
                     }
                 }
 
-                Section("Localização") {
+                Section("Location") {
                     HStack {
                         Label("Lat", systemImage: "location").font(.caption)
                         Spacer()
@@ -398,16 +398,16 @@ struct POIDetailView: View {
                     }
                 }
 
-                Section("Contribuição") {
-                    Label("Por: \(poi.author == "admin" ? "Equipe BikeMap" : poi.author)", systemImage: "person.circle")
+                Section("Contribution") {
+                    Label("By: \(poi.author == "admin" ? "BikeMap Team" : poi.author)", systemImage: "person.circle")
                 }
 
             }
-            .navigationTitle("Ponto no Mapa")
+            .navigationTitle("Map Point")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fechar") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
             }
         }

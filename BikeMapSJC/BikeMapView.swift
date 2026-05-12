@@ -14,7 +14,7 @@ struct BikeMapView: UIViewRepresentable {
         mapView.showsUserLocation = true
         mapView.showsCompass = false
 
-        // Initial region: São José dos Campos
+        // Initial region: Washington, DC
         let center = CLLocationCoordinate2D(latitude: -23.1794, longitude: -45.8869)
         mapView.setRegion(MKCoordinateRegion(center: center, span: .init(latitudeDelta: 0.12, longitudeDelta: 0.12)), animated: false)
 

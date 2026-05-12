@@ -20,7 +20,7 @@ struct BikeListView: View {
                     }
                 }
             }
-            .navigationTitle("Minhas Bikes")
+            .navigationTitle("My Bikes")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -42,19 +42,19 @@ struct BikeListView: View {
             .sheet(item: $editingBike) { bike in
                 BikeFormView(appState: appState, existing: bike)
             }
-            .alert("Remover bike?", isPresented: .init(
+            .alert("Delete bike?", isPresented: .init(
                 get: { deletingBike != nil },
                 set: { if !$0 { deletingBike = nil } }
             )) {
-                Button("Cancelar", role: .cancel) { deletingBike = nil }
-                Button("Remover", role: .destructive) {
+                Button("Cancel", role: .cancel) { deletingBike = nil }
+                Button("Delete", role: .destructive) {
                     if let bike = deletingBike {
                         Task { try? await appState.deleteBike(bike) }
                         deletingBike = nil
                     }
                 }
             } message: {
-                Text("Tem certeza que deseja remover \"\(deletingBike?.nickname ?? "")\"?")
+                Text("Are you sure you want to delete \"\(deletingBike?.nickname ?? "")\"?")
             }
         }
     }
@@ -114,12 +114,12 @@ struct BikeListView: View {
                 Button {
                     editingBike = bike
                 } label: {
-                    Label("Editar", systemImage: "pencil")
+                    Label("Edit", systemImage: "pencil")
                 }
                 Button(role: .destructive) {
                     deletingBike = bike
                 } label: {
-                    Label("Remover", systemImage: "trash")
+                    Label("Delete", systemImage: "trash")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -136,9 +136,9 @@ struct BikeListView: View {
             Image(systemName: "bicycle")
                 .font(.system(size: 56))
                 .foregroundStyle(.secondary)
-            Text("Nenhuma bike registrada")
+            Text("No bikes registered")
                 .font(.headline)
-            Text("Registre sua bike para ter todas as informações disponíveis em caso de roubo.")
+            Text("Register your bike so you have all the details on hand if it's ever stolen.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -146,7 +146,7 @@ struct BikeListView: View {
             Button {
                 showAddBike = true
             } label: {
-                Label("Registrar minha bike", systemImage: "plus.circle.fill")
+                Label("Register my bike", systemImage: "plus.circle.fill")
                     .fontWeight(.semibold)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)

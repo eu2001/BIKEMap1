@@ -11,7 +11,7 @@ struct LayersPanelView: View {
 
             // MARK: Header
             HStack {
-                Label("Mapa Cicloviário", systemImage: "bicycle")
+                Label("Bike Map", systemImage: "bicycle")
                     .font(.headline).fontWeight(.bold)
                 Spacer()
                 Button {
@@ -36,7 +36,7 @@ struct LayersPanelView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
 
-                    sectionLabel("Infraestrutura Ciclável", icon: "road.lanes")
+                    sectionLabel("Bike Infrastructure", icon: "road.lanes")
 
                     ForEach(InfraType.allCases, id: \.rawValue) { type in
                         layerRow(key: type.rawValue, label: type.label,
@@ -47,7 +47,7 @@ struct LayersPanelView: View {
                     }
 
                     Divider().padding(.top, 4)
-                    sectionLabel("Pontos de Interesse", icon: "mappin.and.ellipse")
+                    sectionLabel("Points of Interest", icon: "mappin.and.ellipse")
 
                     ForEach(POIType.allCases, id: \.rawValue) { type in
                         layerRow(key: type.rawValue, label: type.label,
@@ -59,17 +59,17 @@ struct LayersPanelView: View {
                     Divider().padding(.vertical, 8)
 
                     // Quick actions
-                    actionRow("Mostrar tudo", icon: "eye.fill", tint: .primary) {
+                    actionRow("Show all", icon: "eye.fill", tint: .primary) {
                         InfraType.allCases.forEach { appState.layerVisibility[$0.rawValue] = true }
                         POIType.allCases.forEach   { appState.layerVisibility[$0.rawValue] = true }
                     }
                     Divider().padding(.leading, 48)
-                    actionRow("Limpar mapa", icon: "xmark.circle.fill", tint: .red) {
+                    actionRow("Clear map", icon: "xmark.circle.fill", tint: .red) {
                         InfraType.allCases.forEach { appState.layerVisibility[$0.rawValue] = false }
                         POIType.allCases.forEach   { appState.layerVisibility[$0.rawValue] = false }
                     }
                     Divider().padding(.leading, 48)
-                    actionRow("Ocultar tudo", icon: "eye.slash", tint: .secondary) {
+                    actionRow("Hide all", icon: "eye.slash", tint: .secondary) {
                         InfraType.allCases.forEach { appState.layerVisibility[$0.rawValue] = false }
                         POIType.allCases.forEach   { appState.layerVisibility[$0.rawValue] = false }
                     }
@@ -77,11 +77,11 @@ struct LayersPanelView: View {
                     if appState.currentUserName != nil {
                         Divider().padding(.vertical, 8)
 
-                        // Adicionar ponto — light blue button
+                        // Add point — light blue button
                         Button {
                             showTypePicker = true
                         } label: {
-                            Label("Adicionar ponto", systemImage: "plus.circle.fill")
+                            Label("Add point", systemImage: "plus.circle.fill")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -101,11 +101,11 @@ struct LayersPanelView: View {
                             }
                         }
 
-                        // Reportar Furto — red background, white text
+                        // Report Theft — red background, white text
                         Button {
                             showFurtoAlert = true
                         } label: {
-                            Label("Reportar Furto", systemImage: "lock.open.fill")
+                            Label("Report Theft", systemImage: "lock.open.fill")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -114,9 +114,9 @@ struct LayersPanelView: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
                         }
-                        .alert("Reportar Furto de Bicicleta", isPresented: $showFurtoAlert) {
-                            Button("Cancelar", role: .cancel) { }
-                            Button("Confirmar", role: .destructive) {
+                        .alert("Report Bike Theft", isPresented: $showFurtoAlert) {
+                            Button("Cancel", role: .cancel) { }
+                            Button("Confirm", role: .destructive) {
                                 appState.pendingPOIType = .furto
                                 withAnimation(.spring(response: 0.35)) { appState.showSidebar = false }
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -124,14 +124,14 @@ struct LayersPanelView: View {
                                 }
                             }
                         } message: {
-                            Text("Isso irá alertar os membros da comunidade sobre o incidente. Lembre-se de registrar um boletim de ocorrência na polícia.")
+                            Text("This will alert community members about the incident. For emergencies call 911, and file a police report with MPD (Metropolitan Police Department).")
                         }
 
-                        // Reportar Acidente — light orange background, white text
+                        // Report Crash — light orange background, white text
                         Button {
                             showAcidenteAlert = true
                         } label: {
-                            Label("Reportar Acidente", systemImage: "exclamationmark.triangle.fill")
+                            Label("Report Crash", systemImage: "exclamationmark.triangle.fill")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -140,9 +140,9 @@ struct LayersPanelView: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
                         }
-                        .alert("Reportar Acidente com Ciclista", isPresented: $showAcidenteAlert) {
-                            Button("Cancelar", role: .cancel) { }
-                            Button("Continuar", role: .destructive) {
+                        .alert("Report Cyclist Crash", isPresented: $showAcidenteAlert) {
+                            Button("Cancel", role: .cancel) { }
+                            Button("Continue", role: .destructive) {
                                 appState.pendingPOIType = .acidente_ferido
                                 withAnimation(.spring(response: 0.35)) { appState.showSidebar = false }
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -150,7 +150,7 @@ struct LayersPanelView: View {
                                 }
                             }
                         } message: {
-                            Text("Se houver feridos ou risco à segurança, entre em contato imediatamente com a polícia (190) ou solicite assistência médica (192/193) antes de registrar o ocorrido.")
+                            Text("If anyone is injured or in danger, call 911 immediately before logging the incident here.")
                         }
                     }
 

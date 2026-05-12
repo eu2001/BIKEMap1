@@ -34,7 +34,7 @@ struct EditProfileView: View {
                     .padding(.vertical, 8)
                 }
 
-                // MARK: Bike principal (only if user has bikes)
+                // MARK: Primary bike (only if user has bikes)
                 if !appState.bikes.isEmpty {
                     Section {
                         // None option
@@ -46,7 +46,7 @@ struct EditProfileView: View {
                                     .frame(width: 36, height: 36)
                                     .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 8))
                                     .foregroundStyle(.secondary)
-                                Text("Nenhuma").foregroundStyle(.primary)
+                                Text("None").foregroundStyle(.primary)
                                 Spacer()
                                 if selectedBikeId == nil {
                                     Image(systemName: "checkmark").foregroundStyle(.blue)
@@ -95,9 +95,9 @@ struct EditProfileView: View {
                             .buttonStyle(.plain)
                         }
                     } header: {
-                        Text("Bike principal")
+                        Text("Primary bike")
                     } footer: {
-                        Text("Aparece em destaque no seu perfil.")
+                        Text("Featured on your profile.")
                     }
                 }
 
@@ -110,11 +110,11 @@ struct EditProfileView: View {
                     }
                 }
             }
-            .navigationTitle("Editar Perfil")
+            .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -123,7 +123,7 @@ struct EditProfileView: View {
                         if saving {
                             ProgressView()
                         } else {
-                            Text("Salvar").fontWeight(.semibold)
+                            Text("Save").fontWeight(.semibold)
                         }
                     }
                     .disabled(saving)
@@ -146,7 +146,7 @@ struct EditProfileView: View {
             await MainActor.run { appState.selectedBikeId = selectedBikeId }
             dismiss()
         } catch {
-            errorMsg = "Erro ao salvar perfil. Tente novamente."
+            errorMsg = "Error saving profile. Try again."
         }
         saving = false
     }
