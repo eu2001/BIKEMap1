@@ -26,7 +26,7 @@ struct ReportFurtoView: View {
             Form {
 
                 // MARK: Location
-                Section("Localização do incidente") {
+                Section("Incident location") {
                     if let coord = coordinate {
                         HStack {
                             Image(systemName: "mappin.circle.fill").foregroundStyle(.red)
@@ -50,7 +50,7 @@ struct ReportFurtoView: View {
                                 .foregroundStyle(.orange)
                         }
                     } else {
-                        Label("Nenhuma localização selecionada", systemImage: "exclamationmark.triangle")
+                        Label("No location selected", systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.orange)
                     }
                 }
@@ -58,8 +58,8 @@ struct ReportFurtoView: View {
                 // MARK: Bike selector (if user has registered bikes)
                 if !appState.bikes.isEmpty {
                     Section {
-                        Picker("Selecionar bike", selection: $selectedBike) {
-                            Text("Nenhuma selecionada").tag(Optional<BikeRow>.none)
+                        Picker("Select bike", selection: $selectedBike) {
+                            Text("None selected").tag(Optional<BikeRow>.none)
                             ForEach(appState.bikes) { bike in
                                 Text(bike.nickname + (bike.brand.isEmpty ? "" : " (\(bike.brand))"))
                                     .tag(Optional(bike))
@@ -70,10 +70,10 @@ struct ReportFurtoView: View {
                             guard let bike else { return }
                             // Auto-fill description with bike details
                             var parts: [String] = []
-                            if !bike.brand.isEmpty  { parts.append("Marca: \(bike.brand)") }
-                            if !bike.color.isEmpty  { parts.append("Cor: \(bike.color)") }
-                            if !bike.aro.isEmpty    { parts.append("Aro: \(bike.aro)") }
-                            if !bike.serialNumber.isEmpty { parts.append("Nº série: \(bike.serialNumber)") }
+                            if !bike.brand.isEmpty  { parts.append("Brand: \(bike.brand)") }
+                            if !bike.color.isEmpty  { parts.append("Color: \(bike.color)") }
+                            if !bike.aro.isEmpty    { parts.append("Wheel size: \(bike.aro)") }
+                            if !bike.serialNumber.isEmpty { parts.append("Serial #: \(bike.serialNumber)") }
                             if !bike.details.isEmpty { parts.append(bike.details) }
                             description = parts.joined(separator: "\n")
                         }
@@ -107,23 +107,23 @@ struct ReportFurtoView: View {
                                         if !bike.aro.isEmpty   { Text("· \(bike.aro)").font(.caption).foregroundStyle(.secondary) }
                                     }
                                     if !bike.serialNumber.isEmpty {
-                                        Text("Nº série: \(bike.serialNumber)").font(.caption).foregroundStyle(.secondary)
+                                        Text("Serial #: \(bike.serialNumber)").font(.caption).foregroundStyle(.secondary)
                                     }
                                 }
                             }
                             .padding(.vertical, 2)
                         }
                     } header: {
-                        Text("Bike furtada")
+                        Text("Stolen bike")
                     } footer: {
-                        Text("Selecione uma bike cadastrada para preencher automaticamente os detalhes.")
+                        Text("Select a registered bike to auto-fill the details.")
                             .font(.caption)
                     }
                 }
 
                 // MARK: Date & Time
-                Section("Data e hora") {
-                    DatePicker("Data e hora do ocorrido",
+                Section("Date and time") {
+                    DatePicker("When did it happen?",
                                selection: $incidentDate,
                                in: ...Date(),
                                displayedComponents: [.date, .hourAndMinute])
@@ -131,8 +131,8 @@ struct ReportFurtoView: View {
                 }
 
                 // MARK: Description
-                Section("Descrição do incidente") {
-                    TextField("Descreva o que aconteceu, características da bicicleta, suspeitos, etc.",
+                Section("Incident description") {
+                    TextField("Describe what happened, bike details, suspects, etc.",
                               text: $description, axis: .vertical)
                         .lineLimit(4...8)
                 }
@@ -140,7 +140,7 @@ struct ReportFurtoView: View {
                 // MARK: Photo
                 Section {
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                        Label(photoUIImage == nil ? "Adicionar foto da bicicleta" : "Trocar foto",
+                        Label(photoUIImage == nil ? "Add a photo of the bike" : "Replace photo",
                               systemImage: "photo.badge.plus")
                     }
                     if let photoUIImage {
@@ -155,17 +155,17 @@ struct ReportFurtoView: View {
                             self.photoData    = nil
                             self.selectedPhoto = nil
                         } label: {
-                            Label("Remover foto", systemImage: "trash")
+                            Label("Remove photo", systemImage: "trash")
                                 .font(.subheadline)
                         }
                     }
                 } header: {
-                    Text("Foto da bicicleta (opcional)")
+                    Text("Photo of the bike (optional)")
                 }
 
                 // MARK: Contact
-                Section("Informações de contato") {
-                    TextField("Telefone ou e-mail para contato (opcional)", text: $contact)
+                Section("Contact information") {
+                    TextField("Phone or email (optional)", text: $contact)
                         .keyboardType(.default)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -194,7 +194,7 @@ struct ReportFurtoView: View {
                             if loading {
                                 ProgressView().tint(.white)
                             } else {
-                                Label("Reportar Furto", systemImage: "lock.open.fill")
+                                Label("Report Theft", systemImage: "lock.open.fill")
                                     .fontWeight(.semibold)
                             }
                         }
@@ -204,20 +204,20 @@ struct ReportFurtoView: View {
                     .listRowBackground(Color.red)
                     .foregroundStyle(.white)
                 }
-                .alert("Alertar a comunidade?", isPresented: $showConfirmAlert) {
-                    Button("Cancelar", role: .cancel) { }
-                    Button("Sim, alertar", role: .destructive) {
+                .alert("Alert the community?", isPresented: $showConfirmAlert) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Yes, alert", role: .destructive) {
                         Task { await submit() }
                     }
                 } message: {
-                    Text("Se o furto ocorreu há menos de 24h, todos os membros da comunidade BikeMap serão notificados sobre este roubo de bicicleta na região.")
+                    Text("Since the theft occurred within the last 24 hours, all BikeMap community members will be notified about this stolen bike in the area.")
                 }
             }
-            .navigationTitle("Reportar Furto")
+            .navigationTitle("Report Theft")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -252,7 +252,7 @@ struct ReportFurtoView: View {
 
         // Format date/time
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.locale = Locale(identifier: "en_US")
         formatter.dateStyle = .short
         formatter.timeStyle = .short
         let dateStr = formatter.string(from: incidentDate)
@@ -274,9 +274,9 @@ struct ReportFurtoView: View {
 
         let poiTitle: String
         if let bike = selectedBike {
-            poiTitle = "Roubo: \(bike.nickname)"
+            poiTitle = "Stolen: \(bike.nickname)"
         } else {
-            poiTitle = "Roubo de Bicicleta"
+            poiTitle = "Stolen Bicycle"
         }
 
         appState.addPOI(
