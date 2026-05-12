@@ -71,6 +71,7 @@ struct BikeInfraFeature {
 enum POIType: String, CaseIterable, Codable {
     case paraciclo, bike_sharing, loja, reparo, bomba, chuveiro, furto
     case acidente_ferido, acidente_morte
+    case restroom
 
     var emoji: String {
         switch self {
@@ -83,6 +84,7 @@ enum POIType: String, CaseIterable, Codable {
         case .acidente_morte:  return "❌"
         case .bike_sharing:    return "🚴‍♂️"
         case .furto:           return "🔓"
+        case .restroom:        return "🚻"
         }
     }
 
@@ -97,6 +99,7 @@ enum POIType: String, CaseIterable, Codable {
         case .furto:           return "Furtos de Bicicleta"
         case .acidente_ferido: return "Acidentes com Ciclistas"
         case .acidente_morte:  return "Acidentes Fatais"
+        case .restroom:        return "Banheiro Público"
         }
     }
 
@@ -111,6 +114,7 @@ enum POIType: String, CaseIterable, Codable {
         case .acidente_morte:  return .init(red: 0.863, green: 0.149, blue: 0.149, alpha: 1)
         case .bike_sharing:    return .init(red: 0.486, green: 0.227, blue: 0.933, alpha: 1)
         case .furto:           return .init(red: 0.294, green: 0.337, blue: 0.412, alpha: 1)
+        case .restroom:        return .init(red: 0.345, green: 0.420, blue: 0.831, alpha: 1)
         }
     }
 
@@ -118,7 +122,7 @@ enum POIType: String, CaseIterable, Codable {
 
     var canContribute: Bool {
         switch self {
-        case .paraciclo, .loja, .reparo, .bomba, .chuveiro, .furto, .acidente_ferido: return true
+        case .paraciclo, .loja, .reparo, .bomba, .chuveiro, .furto, .acidente_ferido, .restroom: return true
         default: return false
         }
     }
