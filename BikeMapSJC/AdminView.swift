@@ -8,6 +8,7 @@ struct AdminView: View {
     @State private var pendingPOIs: [POI] = []
     @State private var loading      = true
     @State private var processingId: String? = nil
+    @State private var rejectingPOI: POI?    = nil
 
     var body: some View {
         NavigationStack {
@@ -52,6 +53,20 @@ struct AdminView: View {
                 }
             }
             .task { await reload() }
+            .alert("Reject this point?", isPresented: .init(
+                get: { rejectingPOI != nil },
+                set: { if !$0 { rejectingPOI = nil } }
+            )) {
+                Button("Cancel", role: .cancel) { rejectingPOI = nil }
+                Button("Delete", role: .destructive) {
+                    if let poi = rejectingPOI {
+                        rejectingPOI = nil
+                        Task { await reject(poi) }
+                    }
+                }
+            } message: {
+                Text("This permanently removes the point from the database. It cannot be undone.")
+            }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -123,7 +138,7 @@ struct AdminView: View {
             // Action buttons
             HStack(spacing: 10) {
                 Button {
-                    Task { await reject(poi) }
+                    rejectingPOI = poi
                 } label: {
                     Label("Reject", systemImage: "xmark.circle.fill")
                         .font(.subheadline.weight(.semibold))

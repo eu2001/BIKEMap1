@@ -523,12 +523,18 @@ class AppState: ObservableObject {
 
     func rejectPOI(_ poi: POI) async throws {
         try await supabase
+            .from("notifications")
+            .delete()
+            .eq("poi_id", value: poi.id)
+            .execute()
+        try await supabase
             .from("pois")
-            .update(["status": "rejected"])
+            .delete()
             .eq("id", value: poi.id)
             .execute()
         await MainActor.run {
-            showToast("🗑️ Point rejected.")
+            self.pois.removeAll { $0.id == poi.id }
+            showToast("🗑️ Point rejected and deleted.")
         }
     }
 
