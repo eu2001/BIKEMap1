@@ -3,7 +3,7 @@ import UserNotifications
 import CoreLocation
 
 @main
-struct BikeMapSJCApp: App {
+struct BikeMapDCApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
     @State private var showSplash = true
