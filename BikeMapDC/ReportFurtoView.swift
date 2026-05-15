@@ -45,7 +45,7 @@ struct ReportFurtoView: View {
                         .listRowInsets(.init(top: 8, leading: 0, bottom: 8, trailing: 0))
                         .padding(.horizontal, -4)
                         if outOfBounds {
-                            Label(SJCBounds.outOfBoundsMessage, systemImage: "exclamationmark.triangle.fill")
+                            Label(DCBounds.outOfBoundsMessage, systemImage: "exclamationmark.triangle.fill")
                                 .font(.caption)
                                 .foregroundStyle(.orange)
                         }
@@ -225,7 +225,7 @@ struct ReportFurtoView: View {
         .presentationDragIndicator(.visible)
         .onChange(of: coordinate?.latitude) { _, _ in
             if let coord = coordinate {
-                outOfBounds = !SJCBounds.contains(coord)
+                outOfBounds = !DCBounds.contains(coord)
             }
         }
         .onChange(of: selectedPhoto) { _, item in
@@ -243,7 +243,7 @@ struct ReportFurtoView: View {
 
     private func submit() async {
         guard let coord = coordinate else { return }
-        guard SJCBounds.contains(coord) else { outOfBounds = true; return }
+        guard DCBounds.contains(coord) else { outOfBounds = true; return }
         let desc = description.trimmingCharacters(in: .whitespaces)
         guard !desc.isEmpty else { return }
 

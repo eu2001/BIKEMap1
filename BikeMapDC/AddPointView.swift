@@ -33,7 +33,7 @@ struct AddPointView: View {
                                 .foregroundStyle(.secondary)
                         }
                         if outOfBounds {
-                            Label(SJCBounds.outOfBoundsMessage, systemImage: "exclamationmark.triangle.fill")
+                            Label(DCBounds.outOfBoundsMessage, systemImage: "exclamationmark.triangle.fill")
                                 .font(.caption)
                                 .foregroundStyle(.orange)
                         }
@@ -94,7 +94,7 @@ struct AddPointView: View {
         .presentationDragIndicator(.visible)
         .onChange(of: coordinate?.latitude) { _, _ in
             if let coord = coordinate {
-                outOfBounds = !SJCBounds.contains(coord)
+                outOfBounds = !DCBounds.contains(coord)
             }
         }
     }
@@ -102,7 +102,7 @@ struct AddPointView: View {
     private func submit() {
         guard let coord = coordinate,
               !title.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        guard SJCBounds.contains(coord) else { outOfBounds = true; return }
+        guard DCBounds.contains(coord) else { outOfBounds = true; return }
         appState.addPOI(
             type: selectedType,
             coordinate: coord,
