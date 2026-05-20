@@ -98,7 +98,7 @@ enum POIType: String, CaseIterable, Codable {
         case .reparo:          return "Pontos de Reparo"
         case .bomba:           return "Bombas de Ar"
         case .chuveiro:        return "Chuveiro / Vestiário"
-        case .furto:           return "Furtos de Bicicleta"
+        case .furto:           return "Alertas da Comunidade"
         case .acidente_ferido: return "Acidentes com Ciclistas"
         case .acidente_morte:  return "Acidentes Fatais"
         }
@@ -122,7 +122,7 @@ enum POIType: String, CaseIterable, Codable {
 
     var canContribute: Bool {
         switch self {
-        case .paraciclo, .loja, .reparo, .bomba, .chuveiro, .furto, .acidente_ferido: return true
+        case .paraciclo, .loja, .reparo, .bomba, .chuveiro, .furto: return true
         default: return false
         }
     }
@@ -194,9 +194,14 @@ struct AvatarView: View {
 }
 
 let avatarList: [(id: String, name: String)] = [
-    ("tucano",   "Tucano"),
-    ("capivara", "Capivara"),
-    ("muiriqui", "Muriqui"),
-    ("preguica", "Preguiça"),
-    ("gamba",    "Gambá")
+    ("bemtevi",    "Bem-te-vi"),
+    ("capivara",   "Capivara"),
+    ("gamba",      "Gambá"),
+    ("ica",        "Içá"),
+    ("jacare",     "Jacaré"),
+    ("lobo",       "Lobo"),
+    ("muiriqui",   "Muriqui"),
+    ("preguica",   "Preguiça"),
+    ("sussuarana", "Suçuarana"),
+    ("tucano",     "Tucano")
 ]

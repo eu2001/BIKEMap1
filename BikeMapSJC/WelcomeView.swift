@@ -59,6 +59,31 @@ struct WelcomeView: View {
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
                     .padding(.horizontal, 20)
 
+                    // MARK: Continuar como visitante (App Store 5.1.1(v))
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            appState.guestAccess = true
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "map")
+                            Text("Continuar como visitante")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.blue)
+                        .padding(.vertical, 14)
+                        .frame(maxWidth: .infinity)
+                    }
+                    .padding(.top, 14)
+                    .padding(.horizontal, 20)
+
+                    Text("Você pode entrar depois para adicionar pontos, alertar a comunidade ou cadastrar suas bikes.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                        .padding(.top, -4)
+
                 }
                 .padding(.bottom, 40)
             }
@@ -215,10 +240,25 @@ private struct ForgotPasswordSheet: View {
                             .foregroundStyle(.green)
                         Text("E-mail enviado!")
                             .font(.title2.weight(.bold))
-                        Text("Verifique sua caixa de entrada em **\(email)** e siga as instruções para redefinir sua senha.")
+                        Text("Enviamos um link para **\(email)**.")
                             .multilineTextAlignment(.center)
                             .foregroundStyle(.secondary)
                             .font(.subheadline)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Clique no link no e-mail (válido por 1h).",
+                                  systemImage: "1.circle.fill")
+                            Label("Digite a nova senha na página que abrir.",
+                                  systemImage: "2.circle.fill")
+                            Label("Volte aqui e entre com a nova senha.",
+                                  systemImage: "3.circle.fill")
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+                        Text("Não chegou? Confira a pasta de spam.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .padding(.top, 4)
                     }
                     .padding(.horizontal, 24)
                 } else {
@@ -370,7 +410,10 @@ private struct WelcomeRegisterForm: View {
                     .foregroundStyle(.secondary)
                     .padding(.leading, 4)
 
-                HStack(spacing: 8) {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5),
+                    spacing: 12
+                ) {
                     ForEach(avatarList, id: \.id) { av in
                         Button { avatar = av.id } label: {
                             VStack(spacing: 3) {
@@ -382,7 +425,6 @@ private struct WelcomeRegisterForm: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        if av.id != avatarList.last?.id { Spacer() }
                     }
                 }
             }

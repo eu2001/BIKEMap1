@@ -28,6 +28,19 @@ struct ContentView: View {
             header
                 .padding(.top, topSafeArea)
 
+            // MARK: Unread community-alert banner
+            if !appState.unreadAlerts.isEmpty {
+                VStack {
+                    Spacer().frame(height: topSafeArea + 56)
+                    unreadAlertBanner
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.spring(response: 0.35), value: appState.unreadAlerts.count)
+                .zIndex(3)
+            }
+
             // MARK: Offline banner
             if !network.isConnected {
                 VStack {
@@ -145,6 +158,41 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Unread alert banner
+
+    @ViewBuilder
+    private var unreadAlertBanner: some View {
+        VStack(spacing: 6) {
+            ForEach(appState.unreadAlerts.prefix(3)) { alert in
+                Button {
+                    Task { await appState.openAlert(alert) }
+                } label: {
+                    HStack(spacing: 10) {
+                        Text("🚨").font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(alert.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                            Text("Toque para ver a localização")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 2)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     // MARK: - Header bar
 
     private var header: some View {
@@ -193,7 +241,13 @@ struct ContentView: View {
                 }
                 let _ = name  // suppress warning
             } else {
-                Button { appState.showAuth = true } label: {
+                Button {
+                    // Visitante tocando "Entrar" volta pra tela de boas-vindas
+                    // (com entrar / criar conta / continuar como visitante).
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        appState.guestAccess = false
+                    }
+                } label: {
                     Text("Entrar")
                         .font(.subheadline)
                         .fontWeight(.medium)
@@ -211,19 +265,11 @@ struct ContentView: View {
     // MARK: - Floating controls
 
     private var floatingControls: some View {
-        VStack(spacing: 10) {
-            mapButton(icon: "location.fill") {
-                locationManager.requestLocation()
-                appState.shouldCenterOnUser = true
-            }
-
-            mapButton(icon: "plus.magnifyingglass") {
-                appState.zoomDelta = 1
-            }
-
-            mapButton(icon: "minus.magnifyingglass") {
-                appState.zoomDelta = -1
-            }
+        // Zoom +/− buttons removed — pinch gesture handles it. Keep only
+        // the "center on me" button.
+        mapButton(icon: "location.fill") {
+            locationManager.requestLocation()
+            appState.shouldCenterOnUser = true
         }
     }
 
@@ -355,54 +401,235 @@ struct POIDetailView: View {
     let poi: POI
     @ObservedObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @State private var showEdit = false
+    @State private var showDeleteAlert = false
+    @State private var deleting = false
+
+    private var currentPOI: POI {
+        appState.pois.first(where: { $0.id == poi.id }) ?? poi
+    }
+
+    /// Limpa do texto qualquer ocorrência de "Lat: x.xxx Lng: y.yyy" que possa
+    /// ter sido salva acidentalmente pelo importador ou em pontos antigos —
+    /// regra do produto: nunca expor coordenadas brutas pro usuário final.
+    private func cleanDescription(_ text: String) -> String {
+        let pattern = "(?i)\\s*\\b(lat(itude)?|lng|long|longitude)\\s*[:=]?\\s*-?\\d+\\.\\d+\\b[,\\s]*"
+        let cleaned = text.replacingOccurrences(of: pattern, with: " ",
+                                                options: .regularExpression)
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Splits the description into (text-without-photo-line, photoURL?).
+    /// Furto reports embed the photo as a "🖼️ <url>" line in the description;
+    /// here we extract it so the URL can be rendered as an image instead of
+    /// shown as a raw link.
+    private func extractPhoto(_ text: String) -> (String, URL?) {
+        let pattern = "🖼️\\s*(https?://\\S+)"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return (text, nil)
+        }
+        let range = NSRange(text.startIndex..., in: text)
+        var photoURL: URL? = nil
+        if let match = regex.firstMatch(in: text, range: range),
+           let urlRange = Range(match.range(at: 1), in: text) {
+            photoURL = URL(string: String(text[urlRange]))
+        }
+        let stripped = regex.stringByReplacingMatches(in: text, range: range, withTemplate: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return (stripped, photoURL)
+    }
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     HStack(spacing: 12) {
-                        Text(poi.poiType.emoji).font(.largeTitle)
+                        Text(currentPOI.poiType.emoji).font(.largeTitle)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(poi.poiType.label).font(.caption).foregroundStyle(.secondary)
-                            Text(poi.title).font(.headline)
+                            Text(currentPOI.poiType.label).font(.caption).foregroundStyle(.secondary)
+                            Text(currentPOI.title).font(.headline)
                         }
                     }
                     .padding(.vertical, 4)
                 }
 
-                if !poi.description.isEmpty {
-                    Section("Descrição") {
-                        Text(poi.description)
+                // Mini map of the POI's location
+                Section("Localização") {
+                    Map(initialPosition: .region(MKCoordinateRegion(
+                        center: currentPOI.coordinate,
+                        latitudinalMeters: 200, longitudinalMeters: 200
+                    ))) {
+                        Marker(currentPOI.title, coordinate: currentPOI.coordinate)
+                            .tint(Color(currentPOI.poiType.uiColor))
+                    }
+                    .mapStyle(.standard(elevation: .flat))
+                    .frame(height: 180)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                }
+
+                let (descNoPhoto, photoURL) = extractPhoto(currentPOI.description)
+                let cleaned = cleanDescription(descNoPhoto)
+
+                if let photoURL {
+                    Section("Foto") {
+                        AsyncImage(url: photoURL) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView().frame(maxWidth: .infinity, minHeight: 180)
+                            case .success(let img):
+                                img.resizable().scaledToFit().cornerRadius(8)
+                            case .failure:
+                                Label("Não foi possível carregar a foto", systemImage: "photo.badge.exclamationmark")
+                                    .foregroundStyle(.secondary)
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     }
                 }
 
-                Section("Localização") {
-                    HStack {
-                        Label("Lat", systemImage: "location").font(.caption)
-                        Spacer()
-                        Text(String(format: "%.5f", poi.lat)).font(.caption).foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Label("Lng", systemImage: "location").font(.caption)
-                        Spacer()
-                        Text(String(format: "%.5f", poi.lng)).font(.caption).foregroundStyle(.secondary)
+                if !cleaned.isEmpty {
+                    Section("Descrição") {
+                        Text(cleaned)
                     }
                 }
 
                 Section("Contribuição") {
-                    Label("Por: \(poi.author == "admin" ? "Equipe BikeMap" : poi.author)", systemImage: "person.circle")
+                    Label("Por: \(currentPOI.author == "admin" ? "Equipe BikeMap" : currentPOI.author)", systemImage: "person.circle")
+                }
+
+                // Botão de exclusão (admin) — visível apenas pra admins
+                if appState.isAdmin {
+                    Section {
+                        Button(role: .destructive) {
+                            showDeleteAlert = true
+                        } label: {
+                            HStack {
+                                Label("Excluir ponto do mapa", systemImage: "trash")
+                                Spacer()
+                                if deleting { ProgressView() }
+                            }
+                        }
+                        .disabled(deleting)
+                    } header: {
+                        Text("Administração")
+                    }
                 }
 
             }
             .navigationTitle("Ponto no Mapa")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if appState.isAdmin {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            showEdit = true
+                        } label: {
+                            Label("Editar", systemImage: "pencil")
+                        }
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fechar") { dismiss() }
                 }
             }
+            .sheet(isPresented: $showEdit) {
+                AdminEditPOIView(poi: currentPOI, appState: appState)
+            }
+            .alert("Excluir este ponto?", isPresented: $showDeleteAlert) {
+                Button("Cancelar", role: .cancel) {}
+                Button("Excluir", role: .destructive) {
+                    Task {
+                        deleting = true
+                        do {
+                            try await appState.adminDeletePOI(currentPOI)
+                            dismiss()
+                        } catch {
+                            appState.showToast("❌ Não foi possível excluir.")
+                        }
+                        deleting = false
+                    }
+                }
+            } message: {
+                Text("Esta ação é permanente. O ponto será removido do mapa pra todos os usuários.")
+            }
+            // Once the user actually sees the theft details, clear the
+            // unread badge on the app icon.
+            .onAppear {
+                if currentPOI.poiType == .furto { AppDelegate.clearBadge() }
+            }
         }
         .presentationDetents([.medium])
+    }
+}
+
+// MARK: - Admin: edit POI title/description
+
+struct AdminEditPOIView: View {
+    let poi: POI
+    @ObservedObject var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var title: String
+    @State private var description: String
+    @State private var loading = false
+    @State private var error = ""
+
+    init(poi: POI, appState: AppState) {
+        self.poi = poi
+        self.appState = appState
+        _title = State(initialValue: poi.title)
+        _description = State(initialValue: poi.description)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Título") {
+                    TextField("Título", text: $title)
+                }
+                Section("Descrição") {
+                    TextEditor(text: $description)
+                        .frame(minHeight: 140)
+                }
+                if !error.isEmpty {
+                    Section { Text(error).foregroundStyle(.red).font(.caption) }
+                }
+            }
+            .navigationTitle("Editar ponto")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancelar") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        if loading { ProgressView() } else { Text("Salvar").fontWeight(.semibold) }
+                    }
+                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || loading)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func save() async {
+        let newTitle = title.trimmingCharacters(in: .whitespaces)
+        guard !newTitle.isEmpty else {
+            error = "O título não pode ficar vazio."
+            return
+        }
+        loading = true; error = ""
+        defer { loading = false }
+        do {
+            try await appState.updatePOIContent(poi, title: newTitle, description: description)
+            dismiss()
+        } catch {
+            self.error = "Não foi possível salvar. Tente novamente."
+        }
     }
 }
 

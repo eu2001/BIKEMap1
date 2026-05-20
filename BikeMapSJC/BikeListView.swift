@@ -138,7 +138,7 @@ struct BikeListView: View {
                 .foregroundStyle(.secondary)
             Text("Nenhuma bike registrada")
                 .font(.headline)
-            Text("Registre sua bike para ter todas as informações disponíveis em caso de roubo.")
+            Text("Registre sua bike para ter todas as informações disponíveis em caso de perda ou desaparecimento.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

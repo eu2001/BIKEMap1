@@ -74,10 +74,35 @@ struct AuthView: View {
                     }
                 }
 
+                // MARK: Admin panel (mostrado logo abaixo do perfil pra admins)
+                if appState.isAdmin {
+                    Section {
+                        Button {
+                            showAdmin = true
+                        } label: {
+                            HStack {
+                                Label("Painel do Administrador", systemImage: "shield.lefthalf.filled")
+                                    .foregroundStyle(.purple)
+                                Spacer()
+                                if appState.pendingPOICount > 0 {
+                                    Text("\(appState.pendingPOICount)")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 2)
+                                        .background(Capsule().fill(Color.red))
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Administração")
+                    }
+                }
+
                 // MARK: Minhas Bikes
                 Section {
                     if !hasBikes {
-                        Text("Guarde as informações da sua bike. Em caso de roubo, você terá todos os dados para ajudar na recuperação e alertar a comunidade.")
+                        Text("Guarde as informações da sua bike. Em caso de perda ou desaparecimento, você terá todos os dados para ajudar na recuperação e alertar a comunidade.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -106,6 +131,49 @@ struct AuthView: View {
                     .listRowInsets(.init(top: 4, leading: 12, bottom: 6, trailing: 12))
                 } header: {
                     Text("Minhas bikes (\(appState.bikes.count))")
+                }
+
+                // MARK: Notificações
+                if !appState.notifications.isEmpty {
+                    Section("Notificações") {
+                        ForEach(appState.notifications.prefix(10)) { entry in
+                            Button {
+                                Task { await appState.openNotification(entry) }
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Text(notificationIcon(for: entry.type))
+                                        .font(.title3)
+                                        .frame(width: 36, height: 36)
+                                        .background(Color.blue.opacity(0.12),
+                                                    in: RoundedRectangle(cornerRadius: 8))
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 6) {
+                                            Text(entry.title)
+                                                .font(.subheadline.weight(.medium))
+                                                .lineLimit(1)
+                                                .foregroundStyle(.primary)
+                                            if entry.read_at == nil {
+                                                Circle().fill(Color.blue)
+                                                    .frame(width: 6, height: 6)
+                                            }
+                                        }
+                                        Text(entry.created_at.formatted(date: .abbreviated, time: .shortened))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    if entry.poi_id != nil {
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.vertical, 2)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
 
                 // MARK: Estatísticas + Pontos contribuídos (unified)
@@ -145,20 +213,6 @@ struct AuthView: View {
                     }
                 }
 
-                // MARK: Admin panel (only for admins)
-                if appState.isAdmin {
-                    Section {
-                        Button {
-                            showAdmin = true
-                        } label: {
-                            Label("Painel do Administrador", systemImage: "shield.lefthalf.filled")
-                                .foregroundStyle(.purple)
-                        }
-                    } header: {
-                        Text("Administração")
-                    }
-                }
-
                 // MARK: Logout
                 Section {
                     Button(role: .destructive) {
@@ -180,6 +234,11 @@ struct AuthView: View {
                 loadingBikes = true
                 await appState.fetchBikes()
                 await appState.fetchUserPOIs()
+                await appState.fetchNotifications()
+                // Refresh the pending count so the red badge on
+                // "Painel do Administrador" populates without waiting
+                // for the next admin-screen open.
+                await appState.refreshPendingCount()
                 loadingBikes = false
             }
             .sheet(isPresented: $showAddBike) {
@@ -273,5 +332,14 @@ struct AuthView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    private func notificationIcon(for type: String) -> String {
+        switch type {
+        case "furto_alert":  return "🚨"
+        case "poi_approved": return "✅"
+        case "poi_rejected": return "🗑️"
+        default:             return "🔔"
+        }
     }
 }

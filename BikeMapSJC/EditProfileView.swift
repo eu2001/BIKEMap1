@@ -12,6 +12,11 @@ struct EditProfileView: View {
     // Change password
     @State private var showChangePw   = false
 
+    // Delete account (App Store Guideline 5.1.1(v))
+    @State private var showDeleteConfirm   = false
+    @State private var deleting            = false
+    @State private var deleteErrorMsg      = ""
+
     var body: some View {
         NavigationStack {
             Form {
@@ -122,6 +127,31 @@ struct EditProfileView: View {
                             .font(.caption)
                     }
                 }
+
+                // MARK: Delete account (App Store guideline 5.1.1(v))
+                Section {
+                    Button(role: .destructive) {
+                        deleteErrorMsg = ""
+                        showDeleteConfirm = true
+                    } label: {
+                        HStack {
+                            Label("Excluir conta", systemImage: "trash")
+                            Spacer()
+                            if deleting { ProgressView() }
+                        }
+                    }
+                    .disabled(deleting || saving)
+
+                    if !deleteErrorMsg.isEmpty {
+                        Label(deleteErrorMsg, systemImage: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                    }
+                } header: {
+                    Text("Zona perigosa")
+                } footer: {
+                    Text("Suas bikes e dados pessoais serão excluídos permanentemente. Suas contribuições no mapa (pontos de interesse, ciclovias e relatos) serão mantidas de forma anônima para preservar a utilidade do mapa.")
+                }
             }
             .navigationTitle("Editar Perfil")
             .navigationBarTitleDisplayMode(.inline)
@@ -152,6 +182,14 @@ struct EditProfileView: View {
         .sheet(isPresented: $showChangePw) {
             ChangePasswordSheet(appState: appState)
         }
+        .alert("Excluir sua conta?", isPresented: $showDeleteConfirm) {
+            Button("Cancelar", role: .cancel) {}
+            Button("Excluir conta", role: .destructive) {
+                Task { await deleteAccount() }
+            }
+        } message: {
+            Text("Esta ação é permanente e não pode ser desfeita.\n\nSeu perfil, suas bikes cadastradas e fotos serão excluídos. Suas contribuições no mapa serão mantidas de forma anônima.")
+        }
     }
 
     private func save() async {
@@ -165,6 +203,21 @@ struct EditProfileView: View {
             errorMsg = "Erro ao salvar perfil. Tente novamente."
         }
         saving = false
+    }
+
+    private func deleteAccount() async {
+        deleting = true
+        deleteErrorMsg = ""
+        do {
+            try await appState.deleteAccount()
+            // Server deleted the account and AppState cleared local state.
+            // Dismiss this sheet — the app will return to the welcome screen
+            // automatically because currentUserId is now nil.
+            await MainActor.run { dismiss() }
+        } catch {
+            deleteErrorMsg = "Não foi possível excluir a conta agora. Verifique sua conexão e tente novamente."
+        }
+        deleting = false
     }
 }
 
