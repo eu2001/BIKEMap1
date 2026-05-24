@@ -453,20 +453,6 @@ struct POIDetailView: View {
                     .padding(.vertical, 4)
                 }
 
-                // Mini map of the POI's location
-                Section("Localização") {
-                    Map(initialPosition: .region(MKCoordinateRegion(
-                        center: currentPOI.coordinate,
-                        latitudinalMeters: 200, longitudinalMeters: 200
-                    ))) {
-                        Marker(currentPOI.title, coordinate: currentPOI.coordinate)
-                            .tint(Color(currentPOI.poiType.uiColor))
-                    }
-                    .mapStyle(.standard(elevation: .flat))
-                    .frame(height: 180)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                }
-
                 let (descNoPhoto, photoURL) = extractPhoto(currentPOI.description)
                 let cleaned = cleanDescription(descNoPhoto)
 
