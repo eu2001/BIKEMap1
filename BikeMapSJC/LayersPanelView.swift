@@ -3,7 +3,6 @@ import SwiftUI
 struct LayersPanelView: View {
     @ObservedObject var appState: AppState
     @State private var showFurtoAlert    = false
-    @State private var showAcidenteAlert = false
     @State private var showTypePicker    = false
 
     var body: some View {
@@ -101,11 +100,15 @@ struct LayersPanelView: View {
                             }
                         }
 
-                        // Reportar Furto — red background, white text
+                        // Alertar Comunidade — red background, white text
                         Button {
                             showFurtoAlert = true
                         } label: {
-                            Label("Reportar Furto", systemImage: "lock.open.fill")
+                            Label {
+                                Text("Alertar Comunidade")
+                            } icon: {
+                                Text("🚨")
+                            }
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -114,7 +117,7 @@ struct LayersPanelView: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
                         }
-                        .alert("Reportar Furto de Bicicleta", isPresented: $showFurtoAlert) {
+                        .alert("Alertar a comunidade?", isPresented: $showFurtoAlert) {
                             Button("Cancelar", role: .cancel) { }
                             Button("Confirmar", role: .destructive) {
                                 appState.pendingPOIType = .furto
@@ -124,34 +127,9 @@ struct LayersPanelView: View {
                                 }
                             }
                         } message: {
-                            Text("Isso irá alertar os membros da comunidade sobre o incidente. Lembre-se de registrar um boletim de ocorrência na polícia.")
+                            Text("Isso irá alertar os membros da comunidade BikeMap sobre uma bike desaparecida na região.")
                         }
 
-                        // Reportar Acidente — light orange background, white text
-                        Button {
-                            showAcidenteAlert = true
-                        } label: {
-                            Label("Reportar Acidente", systemImage: "exclamationmark.triangle.fill")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.orange.opacity(0.7), in: RoundedRectangle(cornerRadius: 10))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                        }
-                        .alert("Reportar Acidente com Ciclista", isPresented: $showAcidenteAlert) {
-                            Button("Cancelar", role: .cancel) { }
-                            Button("Continuar", role: .destructive) {
-                                appState.pendingPOIType = .acidente_ferido
-                                withAnimation(.spring(response: 0.35)) { appState.showSidebar = false }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                    appState.mapPickingMode = .addPoint
-                                }
-                            }
-                        } message: {
-                            Text("Se houver feridos ou risco à segurança, entre em contato imediatamente com a polícia (190) ou solicite assistência médica (192/193) antes de registrar o ocorrido.")
-                        }
                     }
 
                     Spacer(minLength: 40)

@@ -18,12 +18,13 @@ struct WelcomeView: View {
                 VStack(spacing: 0) {
 
                     // MARK: Branding
-                    Image("logo")
+                    Image("capivara")
                         .resizable()
-                        .scaledToFit()
-                        .frame(width: 180, height: 180)
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
-                        .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 4)
+                        .scaledToFill()
+                        .frame(width: 160, height: 160)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white.opacity(0.6), lineWidth: 4))
+                        .shadow(color: .black.opacity(0.22), radius: 16, x: 0, y: 6)
                         .padding(.top, 56)
                         .padding(.bottom, 16)
 
@@ -57,6 +58,31 @@ struct WelcomeView: View {
                     }
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
                     .padding(.horizontal, 20)
+
+                    // MARK: Continuar como visitante (App Store 5.1.1(v))
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            appState.guestAccess = true
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "map")
+                            Text("Continuar como visitante")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.blue)
+                        .padding(.vertical, 14)
+                        .frame(maxWidth: .infinity)
+                    }
+                    .padding(.top, 14)
+                    .padding(.horizontal, 20)
+
+                    Text("Você pode entrar depois para adicionar pontos, alertar a comunidade ou cadastrar suas bikes.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                        .padding(.top, -4)
 
                 }
                 .padding(.bottom, 40)
@@ -96,6 +122,13 @@ private struct WelcomeLoginForm: View {
     @State private var loading  = false
     @State private var showPw   = false
 
+    // Forgot password
+    @State private var showForgot      = false
+    @State private var forgotEmail     = ""
+    @State private var forgotLoading   = false
+    @State private var forgotSent      = false
+    @State private var forgotError     = ""
+
     var body: some View {
         VStack(spacing: 14) {
             fieldGroup {
@@ -121,6 +154,21 @@ private struct WelcomeLoginForm: View {
                     }
                 }
             }
+
+            // Forgot password link
+            Button {
+                forgotEmail = email
+                forgotSent  = false
+                forgotError = ""
+                showForgot  = true
+            } label: {
+                Text("Esqueci minha senha")
+                    .font(.caption)
+                    .foregroundStyle(.blue)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .padding(.horizontal, 4)
+            .padding(.top, -4)
 
             if !error.isEmpty {
                 Label(error, systemImage: "xmark.circle.fill")
@@ -148,6 +196,15 @@ private struct WelcomeLoginForm: View {
             .opacity(email.isEmpty || password.isEmpty ? 0.5 : 1)
         }
         .padding(16)
+        .sheet(isPresented: $showForgot) {
+            ForgotPasswordSheet(
+                email: $forgotEmail,
+                loading: $forgotLoading,
+                sent: $forgotSent,
+                errorMsg: $forgotError,
+                appState: appState
+            )
+        }
     }
 
     private func submit() async {
@@ -162,6 +219,129 @@ private struct WelcomeLoginForm: View {
     }
 }
 
+// MARK: - Forgot Password Sheet
+
+private struct ForgotPasswordSheet: View {
+    @Binding var email:    String
+    @Binding var loading:  Bool
+    @Binding var sent:     Bool
+    @Binding var errorMsg: String
+    @ObservedObject var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                if sent {
+                    // Success state
+                    VStack(spacing: 16) {
+                        Image(systemName: "envelope.badge.checkmark.fill")
+                            .font(.system(size: 56))
+                            .foregroundStyle(.green)
+                        Text("E-mail enviado!")
+                            .font(.title2.weight(.bold))
+                        Text("Enviamos um link para **\(email)**.")
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Clique no link no e-mail (válido por 1h).",
+                                  systemImage: "1.circle.fill")
+                            Label("Digite a nova senha na página que abrir.",
+                                  systemImage: "2.circle.fill")
+                            Label("Volte aqui e entre com a nova senha.",
+                                  systemImage: "3.circle.fill")
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+                        Text("Não chegou? Confira a pasta de spam.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .padding(.top, 4)
+                    }
+                    .padding(.horizontal, 24)
+                } else {
+                    // Input state
+                    VStack(spacing: 8) {
+                        Image(systemName: "lock.rotation")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.blue)
+                        Text("Redefinir senha")
+                            .font(.title2.weight(.bold))
+                        Text("Digite seu e-mail e enviaremos um link para criar uma nova senha.")
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                    }
+                    .padding(.horizontal, 24)
+
+                    VStack(spacing: 0) {
+                        TextField("E-mail", text: $email)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .padding(.horizontal, 16)
+                            .frame(height: 48)
+                    }
+                    .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray4), lineWidth: 0.5))
+                    .padding(.horizontal, 24)
+
+                    if !errorMsg.isEmpty {
+                        Label(errorMsg, systemImage: "xmark.circle.fill")
+                            .font(.caption).foregroundStyle(.red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 28)
+                    }
+
+                    Button {
+                        Task { await sendReset() }
+                    } label: {
+                        Group {
+                            if loading {
+                                ProgressView().tint(.white)
+                            } else {
+                                Text("Enviar link").fontWeight(.semibold)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color.blue, in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(.white)
+                    }
+                    .disabled(email.trimmingCharacters(in: .whitespaces).isEmpty || loading)
+                    .opacity(email.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
+                    .padding(.horizontal, 24)
+                }
+
+                Spacer()
+            }
+            .padding(.top, 32)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Fechar") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func sendReset() async {
+        errorMsg = ""; loading = true
+        defer { loading = false }
+        do {
+            try await appState.resetPassword(email: email.lowercased().trimmingCharacters(in: .whitespaces))
+            sent = true
+        } catch {
+            errorMsg = "Não foi possível enviar. Verifique o e-mail e tente novamente."
+        }
+    }
+}
+
 // MARK: - Register Form
 
 private struct WelcomeRegisterForm: View {
@@ -171,7 +351,7 @@ private struct WelcomeRegisterForm: View {
     @State private var email       = ""
     @State private var password    = ""
     @State private var confirm     = ""
-    @State private var avatar      = "capivara"
+    @State private var avatar      = "muiriqui"
     @State private var error       = ""
     @State private var loading     = false
     @State private var showPw      = false
@@ -230,7 +410,10 @@ private struct WelcomeRegisterForm: View {
                     .foregroundStyle(.secondary)
                     .padding(.leading, 4)
 
-                HStack(spacing: 8) {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5),
+                    spacing: 12
+                ) {
                     ForEach(avatarList, id: \.id) { av in
                         Button { avatar = av.id } label: {
                             VStack(spacing: 3) {
@@ -242,7 +425,6 @@ private struct WelcomeRegisterForm: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        if av.id != avatarList.last?.id { Spacer() }
                     }
                 }
             }

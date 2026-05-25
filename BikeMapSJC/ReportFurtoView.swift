@@ -18,41 +18,79 @@ struct ReportFurtoView: View {
     @State private var selectedBike: BikeRow?
     @State private var outOfBounds      = false
 
-    private var coordinate: CLLocationCoordinate2D? { appState.pendingAddCoordinate }
+    // Coordenada ao vivo do pino — arrastando o mini-mapa atualiza este valor.
+    @State private var pinCoordinate: CLLocationCoordinate2D
+    @State private var mapPosition:    MapCameraPosition
+
+    init(appState: AppState) {
+        self.appState = appState
+        // Centro inicial: a coordenada que o usuário tocou no mapa principal,
+        // ou o centro de SJC se nada foi pré-selecionado.
+        let initial = appState.pendingAddCoordinate
+            ?? CLLocationCoordinate2D(latitude: -23.1794, longitude: -45.8869)
+        _pinCoordinate = State(initialValue: initial)
+        _mapPosition   = State(initialValue: .region(MKCoordinateRegion(
+            center: initial,
+            span: .init(latitudeDelta: 0.004, longitudeDelta: 0.004)
+        )))
+    }
+
     private var isRecent: Bool { Date().timeIntervalSince(incidentDate) < 2 * 24 * 3600 }
 
     var body: some View {
         NavigationStack {
             Form {
 
-                // MARK: Location
-                Section("Localização do incidente") {
-                    if let coord = coordinate {
-                        HStack {
-                            Image(systemName: "mappin.circle.fill").foregroundStyle(.red)
-                            Text(String(format: "%.5f, %.5f", coord.latitude, coord.longitude))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        Map(position: .constant(.region(MKCoordinateRegion(
-                            center: coord,
-                            span: .init(latitudeDelta: 0.004, longitudeDelta: 0.004)
-                        )))) {
-                            Marker("", coordinate: coord)
-                        }
-                        .frame(height: 120)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .listRowInsets(.init(top: 8, leading: 0, bottom: 8, trailing: 0))
-                        .padding(.horizontal, -4)
-                        if outOfBounds {
-                            Label(SJCBounds.outOfBoundsMessage, systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                        }
-                    } else {
-                        Label("Nenhuma localização selecionada", systemImage: "exclamationmark.triangle")
+                // MARK: Location — mini-mapa arrastavel
+                Section {
+                    HStack {
+                        Image(systemName: "mappin.circle.fill").foregroundStyle(.red)
+                        Text(String(format: "%.5f, %.5f", pinCoordinate.latitude, pinCoordinate.longitude))
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    if outOfBounds {
+                        Label(SJCBounds.outOfBoundsMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
                             .foregroundStyle(.orange)
                     }
+
+                    Text("Arraste o novo ponto para a localização exata")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+
+                    // Mini-mapa interativo: arraste para posicionar o pino com precisao.
+                    ZStack {
+                        Map(position: $mapPosition)
+                            .mapStyle(.standard(elevation: .flat))
+                            .onMapCameraChange(frequency: .continuous) { context in
+                                pinCoordinate = context.region.center
+                                outOfBounds   = !SJCBounds.contains(pinCoordinate)
+                            }
+
+                        // Pino fixo no centro — a ponta marca o centro do mapa.
+                        VStack(spacing: 0) {
+                            Image(systemName: "mappin")
+                                .font(.system(size: 30, weight: .bold))
+                                .foregroundStyle(.red)
+                                .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+                            Spacer().frame(height: 30)
+                        }
+                        .allowsHitTesting(false)
+
+                        Circle()
+                            .stroke(Color.red.opacity(0.4), lineWidth: 1)
+                            .frame(width: 6, height: 6)
+                            .allowsHitTesting(false)
+                    }
+                    .frame(height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .listRowInsets(.init(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .padding(.horizontal, -4)
+
+                } header: {
+                    Text("Localização do incidente")
                 }
 
                 // MARK: Bike selector (if user has registered bikes)
@@ -114,7 +152,7 @@ struct ReportFurtoView: View {
                             .padding(.vertical, 2)
                         }
                     } header: {
-                        Text("Bike furtada")
+                        Text("Bike desaparecida")
                     } footer: {
                         Text("Selecione uma bike cadastrada para preencher automaticamente os detalhes.")
                             .font(.caption)
@@ -132,7 +170,7 @@ struct ReportFurtoView: View {
 
                 // MARK: Description
                 Section("Descrição do incidente") {
-                    TextField("Descreva o que aconteceu, características da bicicleta, suspeitos, etc.",
+                    TextField("Descreva o ocorrido e as características da bicicleta.",
                               text: $description, axis: .vertical)
                         .lineLimit(4...8)
                 }
@@ -164,11 +202,16 @@ struct ReportFurtoView: View {
                 }
 
                 // MARK: Contact
-                Section("Informações de contato") {
-                    TextField("Telefone ou e-mail para contato (opcional)", text: $contact)
+                Section {
+                    TextField("Telefone ou e-mail para contato", text: $contact)
                         .keyboardType(.default)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                } header: {
+                    Text("Informações de contato")
+                } footer: {
+                    Text("Obrigatório — para que outros membros da comunidade possam te contatar.")
+                        .font(.caption)
                 }
 
                 // MARK: Error
@@ -194,13 +237,17 @@ struct ReportFurtoView: View {
                             if loading {
                                 ProgressView().tint(.white)
                             } else {
-                                Label("Reportar Furto", systemImage: "lock.open.fill")
+                                Label {
+                                    Text("Alertar Comunidade")
+                                } icon: {
+                                    Text("🚨")
+                                }
                                     .fontWeight(.semibold)
                             }
                         }
                         .frame(maxWidth: .infinity)
                     }
-                    .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || coordinate == nil || loading || outOfBounds)
+                    .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || contact.trimmingCharacters(in: .whitespaces).isEmpty || loading || outOfBounds)
                     .listRowBackground(Color.red)
                     .foregroundStyle(.white)
                 }
@@ -210,10 +257,10 @@ struct ReportFurtoView: View {
                         Task { await submit() }
                     }
                 } message: {
-                    Text("Se o furto ocorreu há menos de 24h, todos os membros da comunidade BikeMap serão notificados sobre este roubo de bicicleta na região.")
+                    Text("Se o ocorrido foi há menos de 24h, todos os membros da comunidade BikeMap serão notificados sobre esta bike desaparecida na região.")
                 }
             }
-            .navigationTitle("Reportar Furto")
+            .navigationTitle("Alertar Comunidade")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -223,11 +270,6 @@ struct ReportFurtoView: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .onChange(of: coordinate?.latitude) { _, _ in
-            if let coord = coordinate {
-                outOfBounds = !SJCBounds.contains(coord)
-            }
-        }
         .onChange(of: selectedPhoto) { _, item in
             Task {
                 guard let item else { return }
@@ -242,10 +284,15 @@ struct ReportFurtoView: View {
     // MARK: - Submit
 
     private func submit() async {
-        guard let coord = coordinate else { return }
+        let coord = pinCoordinate
         guard SJCBounds.contains(coord) else { outOfBounds = true; return }
         let desc = description.trimmingCharacters(in: .whitespaces)
         guard !desc.isEmpty else { return }
+        let contactTrimmed = contact.trimmingCharacters(in: .whitespaces)
+        guard !contactTrimmed.isEmpty else {
+            error = "Informe um telefone ou e-mail para contato."
+            return
+        }
 
         error = ""; loading = true
         defer { loading = false }
@@ -264,26 +311,24 @@ struct ReportFurtoView: View {
         }
 
         // Build description block
-        var fullDesc = "📅 \(dateStr)\n📝 \(desc)"
-        if let contact = contact.trimmingCharacters(in: .whitespaces).nonEmpty {
-            fullDesc += "\n📞 \(contact)"
-        }
+        var fullDesc = "📅 \(dateStr)\n📝 \(desc)\n📞 \(contactTrimmed)"
         if let url = imageURL {
             fullDesc += "\n🖼️ \(url)"
         }
 
         let poiTitle: String
         if let bike = selectedBike {
-            poiTitle = "Roubo: \(bike.nickname)"
+            poiTitle = "Bike desaparecida: \(bike.nickname)"
         } else {
-            poiTitle = "Roubo de Bicicleta"
+            poiTitle = "Bike desaparecida"
         }
 
         appState.addPOI(
             type: .furto,
             coordinate: coord,
             title: poiTitle,
-            description: fullDesc
+            description: fullDesc,
+            incidentAt: incidentDate
         )
 
         appState.pendingAddCoordinate = nil

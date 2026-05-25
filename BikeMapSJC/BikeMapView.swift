@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import CoreLocation
 
 // MARK: - UIViewRepresentable
 
@@ -14,9 +15,25 @@ struct BikeMapView: UIViewRepresentable {
         mapView.showsUserLocation = true
         mapView.showsCompass = false
 
-        // Initial region: São José dos Campos
-        let center = CLLocationCoordinate2D(latitude: -23.1794, longitude: -45.8869)
-        mapView.setRegion(MKCoordinateRegion(center: center, span: .init(latitudeDelta: 0.12, longitudeDelta: 0.12)), animated: false)
+        // Initial region: 200m zoom around the user if they're already within
+        // 10km of Praça Afonso Pena (downtown SJC). Otherwise default to a
+        // 200m view of Praça Afonso Pena itself.
+        let pracaAfonsoPena = CLLocationCoordinate2D(latitude: -23.1791,
+                                                     longitude: -45.8872)
+        var initialCenter = pracaAfonsoPena
+        if let userCoord = CLLocationManager().location?.coordinate {
+            let userLoc = CLLocation(latitude: userCoord.latitude,
+                                     longitude: userCoord.longitude)
+            let praca = CLLocation(latitude: pracaAfonsoPena.latitude,
+                                   longitude: pracaAfonsoPena.longitude)
+            if userLoc.distance(from: praca) < 10_000 {
+                initialCenter = userCoord
+            }
+        }
+        mapView.setRegion(
+            MKCoordinateRegion(center: initialCenter,
+                               latitudinalMeters: 200, longitudinalMeters: 200),
+            animated: false)
 
         // Map tap for picking mode
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
@@ -46,6 +63,15 @@ struct BikeMapView: UIViewRepresentable {
             DispatchQueue.main.async { self.appState.shouldCenterOnUser = false }
         }
 
+        if let target = appState.centerOnCoordinate {
+            mapView.setRegion(
+                MKCoordinateRegion(center: target,
+                                   latitudinalMeters: 300, longitudinalMeters: 300),
+                animated: true
+            )
+            DispatchQueue.main.async { self.appState.centerOnCoordinate = nil }
+        }
+
         if appState.zoomDelta != 0 {
             var region = mapView.region
             let factor = appState.zoomDelta > 0 ? 0.5 : 2.0
@@ -59,7 +85,8 @@ struct BikeMapView: UIViewRepresentable {
 
 // MARK: - Coordinator
 
-final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
+final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate,
+                         CLLocationManagerDelegate {
     weak var mapView: MKMapView?
     var appState: AppState
 
@@ -71,7 +98,65 @@ final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegat
     // POI annotations, keyed by poi.id
     private var poiAnnotations: [String: POIAnnotation] = [:]
 
-    init(appState: AppState) { self.appState = appState }
+    // Initial centering on user
+    private var didCenterOnUser = false
+    private let locationManager = CLLocationManager()
+
+    init(appState: AppState) {
+        self.appState = appState
+        super.init()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        locationManager.requestWhenInUseAuthorization()
+    }
+
+    // Called when permission is granted (or already granted) — start getting location
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        if manager.authorizationStatus == .authorizedWhenInUse ||
+           manager.authorizationStatus == .authorizedAlways {
+            manager.requestLocation()
+        }
+    }
+
+    // Called with a single location fix — center the map once, then stop.
+    // Apenas centraliza no usuário se ele estiver dentro de SJC; caso
+    // contrário, mantém o centro padrão da cidade (já setado no makeUIView).
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard !didCenterOnUser, let loc = locations.last else { return }
+        didCenterOnUser = true
+        manager.stopUpdatingLocation()
+        guard SJCBounds.contains(loc.coordinate) else {
+            // Fora de SJC — não recentraliza. Mantém a visão da cidade.
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let mv = self?.mapView else { return }
+            // ~100 m de raio ao redor do usuário (região de 200 m × 200 m)
+            let region = MKCoordinateRegion(center: loc.coordinate,
+                                            latitudinalMeters: 200,
+                                            longitudinalMeters: 200)
+            mv.setRegion(region, animated: true)
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        // Silently fall back to the default SJC view
+    }
+
+    // MKMapView also calls this delegate — keep as a safety net
+    func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
+        guard !didCenterOnUser, let loc = userLocation.location else { return }
+        didCenterOnUser = true
+        guard SJCBounds.contains(loc.coordinate) else {
+            // Fora de SJC — não recentraliza. Mantém a visão da cidade.
+            return
+        }
+        // ~100 m de raio ao redor do usuário (região de 200 m × 200 m)
+        let region = MKCoordinateRegion(center: loc.coordinate,
+                                        latitudinalMeters: 200,
+                                        longitudinalMeters: 200)
+        mapView.setRegion(region, animated: true)
+    }
 
     // MARK: Setup
 
@@ -119,6 +204,16 @@ final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegat
     }
 
     func syncPOIs(mapView: MKMapView, pois: [POI], visibility: [String: Bool]) {
+        let validIds = Set(pois.map(\.id))
+
+        // Drop annotations for POIs that no longer exist (e.g. admin deleted them).
+        // Without this, deleted points stay cached and keep being re-added to the map.
+        for (poiId, ann) in poiAnnotations where !validIds.contains(poiId) {
+            mapView.removeAnnotation(ann)
+            poiAnnotations.removeValue(forKey: poiId)
+        }
+
+        // Add fresh annotations for any new POIs.
         for poi in pois where poiAnnotations[poi.id] == nil {
             poiAnnotations[poi.id] = POIAnnotation(poi: poi)
         }

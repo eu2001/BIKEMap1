@@ -40,7 +40,19 @@ class AppState: ObservableObject {
 
     // MARK: - UI state
 
+    /// True quando o usuário escolheu "Continuar como visitante" na tela de
+    /// boas-vindas. Necessário pela diretriz Apple 5.1.1(v) — funcionalidades
+    /// que não dependem de conta (só ver o mapa) precisam estar acessíveis
+    /// sem login. Limpado automaticamente quando o login/cadastro dá certo.
     @Published var guestAccess       = false
+    /// Contagem de POIs aguardando moderação. Alimenta o badge vermelho
+    /// no avatar e a linha "Painel do Administrador" do Meu Perfil.
+    @Published var pendingPOICount: Int = 0
+
+    /// When non-nil, the map listens and pans/zooms to this coordinate.
+    /// Set after admin approve so the freshly-published point lands in
+    /// view; cleared by BikeMapView once consumed. Mirrors BikeMap SP.
+    @Published var centerOnCoordinate: CLLocationCoordinate2D? = nil
     @Published var showSidebar       = false
     @Published var showLegend        = false
     @Published var showRanking       = false
@@ -53,6 +65,31 @@ class AppState: ObservableObject {
     @Published var pendingPOIType: POIType?
     @Published var shouldCenterOnUser    = false
     @Published var notificationTargetPOI: POI? = nil
+
+    /// Unread community-alert notifications for the current user. Surfaced
+    /// as a small banner in the map UI; the user taps one to open its POI.
+    struct UnreadAlert: Identifiable {
+        let id: UUID
+        let poiId: String
+        let title: String
+        let body: String
+        let lat: Double?
+        let lng: Double?
+    }
+    @Published var unreadAlerts: [UnreadAlert] = []
+
+    struct NotificationEntry: Identifiable, Decodable {
+        let id: UUID
+        let type: String
+        let poi_id: String?
+        let title: String
+        let body: String?
+        let lat: Double?
+        let lng: Double?
+        let read_at: Date?
+        let created_at: Date
+    }
+    @Published var notifications: [NotificationEntry] = []
     @Published var zoomDelta: Double     = 0   // +1 = zoom in, -1 = zoom out
 
     // MARK: - Toast
@@ -86,7 +123,7 @@ class AppState: ObservableObject {
                 // Don't notify the user who just reported it
                 await MainActor.run {
                     if authorId != self.currentUserId?.uuidString {
-                        self.showToast("🔓 Novo roubo de bicicleta reportado na região! Fique atento.")
+                        self.showToast("🔓 Nova bike desaparecida reportada na região.")
                     }
                 }
             }
@@ -102,11 +139,15 @@ class AppState: ObservableObject {
                 self.currentUserId = session.user.id
             }
             await fetchProfile(userId: session.user.id)
+            await MainActor.run { self.requestPushPermission() }
+            await openLatestUnreadFurtoIfAny()
         } catch {
             // No active session — show welcome screen
         }
         // Always load POIs — the table is publicly readable
         await fetchPOIs()
+        // If this user is an admin, prime the pending-count badge.
+        await refreshPendingCount()
     }
 
     // MARK: - Auth
@@ -139,9 +180,14 @@ class AppState: ObservableObject {
 
     func signIn(email: String, password: String) async throws {
         let session = try await supabase.auth.signIn(email: email, password: password)
-        await MainActor.run { self.currentUserId = session.user.id }
+        await MainActor.run {
+            self.currentUserId = session.user.id
+            self.guestAccess = false
+        }
         await fetchProfile(userId: session.user.id)
         await fetchPOIs()
+        await MainActor.run { self.requestPushPermission() }
+        await openLatestUnreadFurtoIfAny()
     }
 
     func logout() {
@@ -161,17 +207,71 @@ class AppState: ObservableObject {
         }
     }
 
+    /// Permanently deletes the current user's account.
+    ///
+    /// Calls the `delete-account` Supabase Edge Function, which uses the
+    /// service role to: remove bikes + bike photos, delete push tokens,
+    /// anonymize POI contributions, delete the profile row, and finally
+    /// delete the auth user. On success the caller is signed out and all
+    /// local state is cleared.
+    ///
+    /// Required for App Store Guideline 5.1.1(v) — apps with account
+    /// creation must offer in-app account deletion.
+    func deleteAccount() async throws {
+        guard currentUserId != nil else {
+            throw AppError.message("Você não está logado.")
+        }
+        // The Supabase Swift SDK automatically attaches the current
+        // session's JWT in the Authorization header, which the edge
+        // function uses to identify the caller.
+        try await supabase.functions.invoke(
+            "delete-account",
+            options: .init()
+        )
+
+        // Sign out locally (server already deleted the user)
+        try? await supabase.auth.signOut()
+        await MainActor.run {
+            self.currentUserName = nil
+            self.currentUserId = nil
+            self.currentProfile = nil
+            self.guestAccess = false
+            self.pois          = []
+            self.bikes         = []
+            self.userPOIs      = []
+            self.selectedBikeId = nil
+            showToast("Conta excluída. Sentiremos sua falta. 🚴")
+        }
+    }
+
     // MARK: - Profile
 
     func fetchProfile(userId: UUID) async {
         do {
-            let profile: ProfileRow = try await supabase
+            let rows: [ProfileRow] = try await supabase
                 .from("profiles")
                 .select()
                 .eq("id", value: userId)
-                .single()
+                .limit(1)
                 .execute()
                 .value
+
+            guard let profile = rows.first else {
+                print("fetchProfile: profile row missing — forcing logout")
+                await MainActor.run {
+                    showToast("Sua conta foi removida pelo administrador.")
+                    logout()
+                }
+                return
+            }
+            if profile.isBlocked {
+                print("fetchProfile: profile is_blocked = true — forcing logout")
+                await MainActor.run {
+                    showToast("Sua conta foi bloqueada pelo administrador.")
+                    logout()
+                }
+                return
+            }
             await MainActor.run {
                 self.currentProfile = profile
                 self.currentUserName = profile.username
@@ -197,6 +297,18 @@ class AppState: ObservableObject {
         }
     }
 
+    func resetPassword(email: String) async throws {
+        // Depende do "Site URL" configurado no painel do Supabase
+        // (Authentication → URL Configuration). Apple-style flow: o usuário
+        // clica no link do e-mail, Supabase mostra um formulário pra digitar
+        // a nova senha, depois redireciona pro Site URL.
+        try await supabase.auth.resetPasswordForEmail(email)
+    }
+
+    func changePassword(newPassword: String) async throws {
+        try await supabase.auth.update(user: UserAttributes(password: newPassword))
+    }
+
     // MARK: - POIs
 
     func fetchPOIs() async {
@@ -220,7 +332,8 @@ class AppState: ObservableObject {
     }
 
     func addPOI(type: POIType, coordinate: CLLocationCoordinate2D,
-                title: String, description: String) {
+                title: String, description: String,
+                incidentAt: Date? = nil) {
         guard let userId = currentUserId,
               let userName = currentUserName else { return }
 
@@ -237,19 +350,23 @@ class AppState: ObservableObject {
                     let lat, lng: Double
                     let authorUsername: String
                     let authorId: UUID
+                    let incidentAt: String?
                     enum CodingKeys: String, CodingKey {
                         case id, type, title, description, status, lat, lng
                         case authorUsername = "author_username"
                         case authorId = "author_id"
+                        case incidentAt = "incident_at"
                     }
                 }
                 // All user submissions start as "pending" — admin must approve before appearing on map
                 let status = "pending"
+                let incidentAtISO = incidentAt.map { ISO8601DateFormatter().string(from: $0) }
                 try await supabase.from("pois").insert(
                     InsertRow(id: id, type: type.rawValue, title: title,
                               description: description, status: status,
                               lat: coordinate.latitude, lng: coordinate.longitude,
-                              authorUsername: userName, authorId: userId)
+                              authorUsername: userName, authorId: userId,
+                              incidentAt: incidentAtISO)
                 ).execute()
 
                 await MainActor.run {
@@ -466,6 +583,7 @@ class AppState: ObservableObject {
                 .order("created_at", ascending: false)
                 .execute()
                 .value
+            await MainActor.run { self.pendingPOICount = rows.count }
             return rows.map { $0.asPOI }
         } catch {
             print("fetchPendingPOIs error: \(error)")
@@ -473,43 +591,335 @@ class AppState: ObservableObject {
         }
     }
 
+    /// Atualiza apenas a contagem (mais barato que buscar todos os POIs).
+    /// Chamado no foreground do app + após cada aprovação/rejeição pra
+    /// manter o badge vermelho do avatar atualizado.
+    func refreshPendingCount() async {
+        // If the profile hasn't loaded yet, wait for it (max ~3 s) so we
+        // don't early-out as "not admin" when actually the user IS admin —
+        // that was the bug that left the red badge empty.
+        if currentProfile == nil {
+            for _ in 0..<30 {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100 ms
+                if currentProfile != nil { break }
+            }
+        }
+        guard isAdmin else {
+            await MainActor.run { pendingPOICount = 0 }
+            return
+        }
+        do {
+            let rows: [POIRow] = try await supabase
+                .from("pois")
+                .select("id")
+                .eq("status", value: "pending")
+                .execute()
+                .value
+            await MainActor.run { pendingPOICount = rows.count }
+        } catch {
+            print("refreshPendingCount error: \(error)")
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // approvePOI / rejectPOI — kept byte-identical to BikeMap SP so the
+    // admin flow is rock-solid: status update → refetch (pick up the
+    // trigger-renamed title) → in-place replace → centerOnCoordinate
+    // → background forced re-fetch → notify-poi-approved fan-out.
+    // ──────────────────────────────────────────────────────────────────
+
     func approvePOI(_ poi: POI) async throws {
         try await supabase
             .from("pois")
             .update(["status": "approved"])
             .eq("id", value: poi.id)
             .execute()
-        await MainActor.run {
-            if !self.pois.contains(where: { $0.id == poi.id }) {
-                self.pois.append(poi)
-            }
-            showToast("✅ Ponto aprovado e publicado no mapa.")
+
+        // The server-side trigger `assign_code_on_approve` assigns a fresh
+        // PA0001/RP0042/etc. code and prepends it to the title. Re-fetch the
+        // row so the local copy uses the new title instead of the old one.
+        var finalPOI = poi
+        var authorIdStr: String? = nil
+        if let rows: [POIRow] = try? await supabase
+            .from("pois").select().eq("id", value: poi.id).limit(1)
+            .execute().value,
+           let row = rows.first {
+            finalPOI = row.asPOI
+            authorIdStr = row.authorId?.uuidString
         }
 
-        // Notify all users only after admin approves a furto
-        if poi.poiType == .furto {
-            try? await supabase.functions.invoke(
-                "notify-users-furto",
-                options: .init(body: [
-                    "poi_id":      poi.id,
-                    "title":       poi.title,
-                    "description": poi.description,
-                    "lat":         String(poi.lat),
-                    "lng":         String(poi.lng)
-                ])
-            )
+        await MainActor.run {
+            if let idx = self.pois.firstIndex(where: { $0.id == finalPOI.id }) {
+                self.pois[idx] = finalPOI
+            } else {
+                self.pois.append(finalPOI)
+                print("approvePOI: appended \(finalPOI.id) of type '\(finalPOI.type)' as \(finalPOI.title)")
+            }
+            self.layerVisibility[finalPOI.type] = true
+            self.centerOnCoordinate = finalPOI.coordinate
+            pendingPOICount = max(0, pendingPOICount - 1)
+            showToast("✅ Ponto aprovado e publicado no mapa.")
         }
+        // Refresh from server, but make sure the just-approved POI survives
+        // even if Postgres read-after-write isn't perfectly consistent yet.
+        let approvedId = poi.id
+        Task { [weak self] in
+            await self?.fetchPOIsForcingRefresh(ensuringIncludes: finalPOI,
+                                                idForCheck: approvedId)
+        }
+
+        // notify-poi-approved fires AFTER local state is updated so the
+        // payload carries the final code-prefixed title (e.g. FU0042 — …),
+        // which the user sees on the lock screen / push tap.
+        var body: [String: String] = [
+            "poi_id":      finalPOI.id,
+            "poi_type":    finalPOI.type,
+            "title":       finalPOI.title,
+            "description": finalPOI.description,
+            "lat":         String(finalPOI.lat),
+            "lng":         String(finalPOI.lng),
+        ]
+        if let aid = authorIdStr { body["author_id"] = aid }
+        try? await supabase.functions.invoke(
+            "notify-poi-approved", options: .init(body: body)
+        )
     }
 
     func rejectPOI(_ poi: POI) async throws {
-        try await supabase
+        // Reject = DELETE the row entirely. The pois_archive trigger keeps a
+        // 30-day backup; the on_poi_deleted trigger decrements the author's
+        // contribution_count so it stops counting toward the ranking.
+        print("rejectPOI: DELETE \(poi.id)")
+        let resp = try await supabase
             .from("pois")
-            .update(["status": "rejected"])
+            .delete()
             .eq("id", value: poi.id)
             .execute()
+        print("rejectPOI: DELETE response status \(resp.response.statusCode)")
         await MainActor.run {
+            self.pois.removeAll { $0.id == poi.id }
+            self.userPOIs.removeAll { $0.id == poi.id }
+            pendingPOICount = max(0, pendingPOICount - 1)
             showToast("🗑️ Ponto rejeitado.")
         }
+        await fetchPOIsForcingRefresh()
+        print("rejectPOI: done for \(poi.id)")
+    }
+
+    /// Forces a fresh fetch from Supabase even if the in-memory state is
+    /// stale. Used after admin actions that mutate the public POI set.
+    /// If `ensuringIncludes` is provided, the POI is re-injected if the
+    /// server fetch happens to miss it (read-after-write lag, etc.) so
+    /// the map stays consistent with what the admin just did.
+    private func fetchPOIsForcingRefresh(ensuringIncludes ensure: POI? = nil,
+                                         idForCheck ensureId: String? = nil) async {
+        do {
+            let rows: [POIRow] = try await supabase
+                .from("pois")
+                .select()
+                .eq("status", value: "approved")
+                .execute()
+                .value
+            var finalPOIs = rows.map(\.asPOI)
+            if let ensure, let id = ensureId,
+               !finalPOIs.contains(where: { $0.id == id }) {
+                finalPOIs.append(ensure)
+                print("fetchPOIsForcingRefresh: server missed \(id); re-injected locally")
+            }
+            await MainActor.run { self.pois = finalPOIs }
+            print("fetchPOIsForcingRefresh: \(finalPOIs.count) POIs in array")
+        } catch {
+            print("fetchPOIsForcingRefresh error: \(error)")
+        }
+    }
+
+    /// Permite que o admin edite título, descrição e localização de qualquer POI.
+    /// Passe `lat`/`lng` pra também relocar; omita pra manter a posição atual.
+    func updatePOIContent(_ poi: POI,
+                          title: String,
+                          description: String,
+                          lat: Double? = nil,
+                          lng: Double? = nil) async throws {
+        guard isAdmin else { return }
+        struct Patch: Encodable {
+            let title: String
+            let description: String
+            let lat: Double?
+            let lng: Double?
+        }
+        try await supabase
+            .from("pois")
+            .update(Patch(title: title, description: description, lat: lat, lng: lng))
+            .eq("id", value: poi.id)
+            .execute()
+
+        let newLat = lat ?? poi.lat
+        let newLng = lng ?? poi.lng
+
+        await MainActor.run {
+            if let idx = pois.firstIndex(where: { $0.id == poi.id }) {
+                pois[idx] = POI(
+                    id: poi.id, type: poi.type,
+                    lat: newLat, lng: newLng,
+                    title: title, description: description,
+                    author: poi.author, createdAt: poi.createdAt
+                )
+            }
+            if selectedPOI?.id == poi.id {
+                selectedPOI = POI(
+                    id: poi.id, type: poi.type,
+                    lat: newLat, lng: newLng,
+                    title: title, description: description,
+                    author: poi.author, createdAt: poi.createdAt
+                )
+            }
+            showToast("✏️ Ponto atualizado.")
+        }
+    }
+
+    /// Admin deleta qualquer ponto do mapa (incluindo aprovados).
+    func adminDeletePOI(_ poi: POI) async throws {
+        guard isAdmin else { return }
+        try await supabase.from("pois").delete().eq("id", value: poi.id).execute()
+        await MainActor.run {
+            pois.removeAll { $0.id == poi.id }
+            userPOIs.removeAll { $0.id == poi.id }
+            if selectedPOI?.id == poi.id { selectedPOI = nil }
+            showToast("🗑️ Ponto excluído do mapa.")
+        }
+    }
+
+    // MARK: - Unread furto notifications
+
+    /// If the current user has any unread `furto_alert` notification, open the
+    /// most recent one in the POI detail sheet and mark it as read so it won't
+    /// surface again. Called on app launch/foreground so users who open the
+    /// app from the home screen (not via the push tap) still land on the new
+    /// stolen-bike point.
+    /// Fetches all unread community-alert notifications for the current user
+    /// and surfaces them via `unreadAlerts`. Does NOT auto-open the detail
+    /// sheet — the user must tap the banner to navigate to a specific alert.
+    func openLatestUnreadFurtoIfAny() async {
+        guard let userId = currentUserId else { return }
+        struct NotifRow: Decodable {
+            let id: UUID
+            let poi_id: String?
+            let title: String?
+            let body: String?
+            let lat: Double?
+            let lng: Double?
+        }
+        do {
+            let rows: [NotifRow] = try await supabase
+                .from("notifications")
+                .select("id,poi_id,title,body,lat,lng")
+                .eq("user_id", value: userId)
+                .eq("type", value: "furto_alert")
+                .is("read_at", value: nil)
+                .order("created_at", ascending: false)
+                .limit(20)
+                .execute()
+                .value
+            let alerts: [UnreadAlert] = rows.compactMap { n in
+                guard let pid = n.poi_id else { return nil }
+                return UnreadAlert(
+                    id: n.id, poiId: pid,
+                    title: n.title ?? "Bike desaparecida",
+                    body: n.body ?? "",
+                    lat: n.lat, lng: n.lng
+                )
+            }
+            await MainActor.run {
+                self.unreadAlerts = alerts
+                if !alerts.isEmpty {
+                    self.layerVisibility[POIType.furto.rawValue] = true
+                }
+            }
+        } catch {
+            print("openLatestUnreadFurtoIfAny error: \(error)")
+        }
+    }
+
+    /// Loads recent notifications for the profile screen.
+    func fetchNotifications() async {
+        guard let userId = currentUserId else { return }
+        do {
+            let rows: [NotificationEntry] = try await supabase
+                .from("notifications")
+                .select("id,type,poi_id,title,body,lat,lng,read_at,created_at")
+                .eq("user_id", value: userId)
+                .order("created_at", ascending: false)
+                .limit(30)
+                .execute()
+                .value
+            await MainActor.run { self.notifications = rows }
+        } catch {
+            print("fetchNotifications error: \(error)")
+        }
+    }
+
+    /// Open a notification from the profile list.
+    func openNotification(_ entry: NotificationEntry) async {
+        if let pid = entry.poi_id {
+            let poi: POI
+            if let existing = pois.first(where: { $0.id == pid }) {
+                poi = existing
+            } else if let lat = entry.lat, let lng = entry.lng {
+                poi = POI(id: pid, type: POIType.furto.rawValue,
+                          lat: lat, lng: lng,
+                          title: entry.title, description: entry.body ?? "",
+                          author: "", createdAt: entry.created_at)
+            } else {
+                return
+            }
+            await MainActor.run {
+                self.selectedPOI = poi
+                self.layerVisibility[poi.type] = true
+                if !self.pois.contains(where: { $0.id == poi.id }) {
+                    self.pois.append(poi)
+                }
+            }
+        }
+        if entry.read_at == nil {
+            try? await supabase
+                .from("notifications")
+                .update(["read_at": ISO8601DateFormatter().string(from: Date())])
+                .eq("id", value: entry.id)
+                .execute()
+            await MainActor.run {
+                self.unreadAlerts.removeAll { $0.id == entry.id }
+            }
+            await fetchNotifications()
+        }
+    }
+
+    /// User tapped an unread-alert banner — open the POI detail sheet for it
+    /// and mark the notification as read so it disappears from the banner.
+    func openAlert(_ alert: UnreadAlert) async {
+        let poi: POI
+        if let existing = pois.first(where: { $0.id == alert.poiId }) {
+            poi = existing
+        } else if let lat = alert.lat, let lng = alert.lng {
+            poi = POI(id: alert.poiId, type: POIType.furto.rawValue,
+                      lat: lat, lng: lng,
+                      title: alert.title, description: alert.body,
+                      author: "", createdAt: nil)
+        } else {
+            return
+        }
+        await MainActor.run {
+            self.selectedPOI = poi
+            self.layerVisibility[POIType.furto.rawValue] = true
+            if !self.pois.contains(where: { $0.id == poi.id }) {
+                self.pois.append(poi)
+            }
+            self.unreadAlerts.removeAll { $0.id == alert.id }
+        }
+        try? await supabase
+            .from("notifications")
+            .update(["read_at": ISO8601DateFormatter().string(from: Date())])
+            .eq("id", value: alert.id)
+            .execute()
     }
 
     // MARK: - Push Notifications
@@ -525,12 +935,19 @@ class AppState: ObservableObject {
     }
 
     func savePushToken(_ token: String) {
+        // RLS on push_tokens requires user_id = auth.uid().
+        // If the APNs token arrives before login (anonymous launch), skip;
+        // we'll re-register after signIn / restoreSession.
+        guard let userId = currentUserId else {
+            print("savePushToken skipped: not authenticated yet")
+            return
+        }
         Task {
             do {
                 struct TokenRow: Encodable {
                     let token: String
                     let platform: String
-                    let userId: UUID?
+                    let userId: UUID
                     enum CodingKeys: String, CodingKey {
                         case token, platform
                         case userId = "user_id"
@@ -538,7 +955,7 @@ class AppState: ObservableObject {
                 }
                 try await supabase
                     .from("push_tokens")
-                    .upsert(TokenRow(token: token, platform: "ios", userId: currentUserId),
+                    .upsert(TokenRow(token: token, platform: "ios", userId: userId),
                             onConflict: "token")
                     .execute()
             } catch {
@@ -561,6 +978,30 @@ class AppState: ObservableObject {
             return profiles.map { (username: $0.username, profile: $0) }
         } catch {
             return []
+        }
+    }
+
+    // MARK: - Admin moderation
+
+    @discardableResult
+    func moderateUser(_ targetId: UUID, action: String) async -> Bool {
+        guard isAdmin else { return false }
+        struct Body: Encodable {
+            let target_user_id: String
+            let action: String
+        }
+        do {
+            try await supabase.functions.invoke(
+                "admin-moderate-user",
+                options: .init(body: Body(
+                    target_user_id: targetId.uuidString,
+                    action: action
+                ))
+            )
+            return true
+        } catch {
+            print("moderateUser \(action) failed: \(error)")
+            return false
         }
     }
 

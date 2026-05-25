@@ -6,6 +6,8 @@ struct RankingView: View {
 
     @State private var ranked: [(username: String, profile: ProfileRow)] = []
     @State private var loading = true
+    @State private var moderating: ProfileRow? = nil
+    @State private var confirmDelete: ProfileRow? = nil
 
     var body: some View {
         NavigationStack {
@@ -59,6 +61,44 @@ struct RankingView: View {
                 }
             }
             .task { await loadRanking() }
+            .confirmationDialog(
+                Text(moderating.map { "Moderar @\($0.username)" } ?? ""),
+                isPresented: Binding(
+                    get: { moderating != nil },
+                    set: { if !$0 { moderating = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: moderating
+            ) { profile in
+                Button(profile.isBlocked ? "Desbloquear" : "Bloquear (não pode adicionar pontos)") {
+                    let target = profile
+                    moderating = nil
+                    Task { await moderate(target, action: target.isBlocked ? "unblock" : "block") }
+                }
+                Button("Excluir usuário do app", role: .destructive) {
+                    let target = profile
+                    moderating = nil
+                    confirmDelete = target
+                }
+                Button("Cancelar", role: .cancel) { moderating = nil }
+            }
+            .alert(
+                "Excluir definitivamente?",
+                isPresented: Binding(
+                    get: { confirmDelete != nil },
+                    set: { if !$0 { confirmDelete = nil } }
+                ),
+                presenting: confirmDelete
+            ) { profile in
+                Button("Cancelar", role: .cancel) { confirmDelete = nil }
+                Button("Excluir conta", role: .destructive) {
+                    let target = profile
+                    confirmDelete = nil
+                    Task { await moderate(target, action: "delete") }
+                }
+            } message: { profile in
+                Text("@\(profile.username) será removido permanentemente. Não poderá entrar novamente com esse e-mail.")
+            }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
@@ -68,6 +108,23 @@ struct RankingView: View {
         loading = true
         ranked = await appState.rankedUsers()
         loading = false
+    }
+
+    private func moderate(_ profile: ProfileRow, action: String) async {
+        let ok = await appState.moderateUser(profile.id, action: action)
+        await MainActor.run {
+            if ok {
+                switch action {
+                case "block":   appState.showToast("🚫 @\(profile.username) bloqueado.")
+                case "unblock": appState.showToast("✅ @\(profile.username) desbloqueado.")
+                case "delete":  appState.showToast("🗑️ @\(profile.username) excluído.")
+                default: break
+                }
+            } else {
+                appState.showToast("❌ Não foi possível moderar @\(profile.username).")
+            }
+        }
+        await loadRanking()
     }
 
     @ViewBuilder
@@ -86,13 +143,25 @@ struct RankingView: View {
                 HStack(spacing: 4) {
                     Text(displayName).fontWeight(isMe ? .bold : .regular)
                     if profile.isPremium { Text("⭐").font(.caption) }
+                    if profile.isAdmin   { Text("🛡️").font(.caption) }
+                    if profile.isBlocked { Text("🚫").font(.caption) }
                     if isMe { Text("(você)").font(.caption).foregroundStyle(.secondary) }
                 }
                 Text("\(profile.contributionCount) pontos")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
+
+            if appState.isAdmin && !isMe && !profile.isAdmin {
+                Image(systemName: "ellipsis.circle")
+                    .foregroundStyle(.secondary)
+            }
         }
         .listRowBackground(isMe ? Color.blue.opacity(0.05) : nil)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard appState.isAdmin, !isMe, !profile.isAdmin else { return }
+            moderating = profile
+        }
     }
 }

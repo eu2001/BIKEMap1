@@ -5,7 +5,7 @@ import SwiftUI
 // MARK: - Infrastructure Types
 
 enum InfraType: String, CaseIterable, Codable {
-    case ciclovia, ciclofaixa, compartilhada, rota_alternativa, proibida, planejada
+    case ciclovia, ciclofaixa, compartilhada, rota_alternativa, proibida, em_construcao, projetada
 
     var uiColor: UIColor {
         switch self {
@@ -14,7 +14,8 @@ enum InfraType: String, CaseIterable, Codable {
         case .compartilhada:    return .init(red: 0.45, green: 0.70, blue: 0.95, alpha: 1) // light blue
         case .rota_alternativa: return .init(red: 0.18, green: 0.65, blue: 0.35, alpha: 1) // green
         case .proibida:         return .init(red: 0.30, green: 0.30, blue: 0.30, alpha: 1) // dark grey
-        case .planejada:        return .init(red: 0.976, green: 0.451, blue: 0.086, alpha: 1) // orange
+        case .projetada:        return .init(red: 0.976, green: 0.451, blue: 0.086, alpha: 1) // orange
+        case .em_construcao:    return .init(red: 0.90, green: 0.70, blue: 0.00, alpha: 1) // yellow
         }
     }
 
@@ -27,7 +28,8 @@ enum InfraType: String, CaseIterable, Codable {
         case .compartilhada:    return 3
         case .rota_alternativa: return 3
         case .proibida:         return 4
-        case .planejada:        return 3
+        case .projetada:        return 3
+        case .em_construcao:    return 4
         }
     }
 
@@ -38,7 +40,8 @@ enum InfraType: String, CaseIterable, Codable {
         case .compartilhada:    return nil
         case .rota_alternativa: return [8, 5]
         case .proibida:         return nil
-        case .planejada:        return [10, 6]
+        case .projetada:        return [10, 6]
+        case .em_construcao:    return [4, 4]
         }
     }
 
@@ -49,7 +52,8 @@ enum InfraType: String, CaseIterable, Codable {
         case .compartilhada:    return "Via Compartilhada"
         case .rota_alternativa: return "Rota Alternativa"
         case .proibida:         return "Via Proibida"
-        case .planejada:        return "Planejada / Em Obras"
+        case .projetada:        return "Projetada"
+        case .em_construcao:    return "Em Construção"
         }
     }
 }
@@ -94,7 +98,7 @@ enum POIType: String, CaseIterable, Codable {
         case .reparo:          return "Pontos de Reparo"
         case .bomba:           return "Bombas de Ar"
         case .chuveiro:        return "Chuveiro / Vestiário"
-        case .furto:           return "Furtos de Bicicleta"
+        case .furto:           return "Alertas da Comunidade"
         case .acidente_ferido: return "Acidentes com Ciclistas"
         case .acidente_morte:  return "Acidentes Fatais"
         }
@@ -118,7 +122,7 @@ enum POIType: String, CaseIterable, Codable {
 
     var canContribute: Bool {
         switch self {
-        case .paraciclo, .loja, .reparo, .bomba, .chuveiro, .furto, .acidente_ferido: return true
+        case .paraciclo, .loja, .reparo, .bomba, .chuveiro, .furto: return true
         default: return false
         }
     }
@@ -190,9 +194,14 @@ struct AvatarView: View {
 }
 
 let avatarList: [(id: String, name: String)] = [
-    ("tucano",   "Tucano"),
-    ("capivara", "Capivara"),
-    ("muiriqui", "Muriqui"),
-    ("preguica", "Preguiça"),
-    ("gamba",    "Gambá")
+    ("bemtevi",    "Bem-te-vi"),
+    ("capivara",   "Capivara"),
+    ("gamba",      "Gambá"),
+    ("ica",        "Içá"),
+    ("jacare",     "Jacaré"),
+    ("lobo",       "Lobo"),
+    ("muiriqui",   "Muriqui"),
+    ("preguica",   "Preguiça"),
+    ("sussuarana", "Suçuarana"),
+    ("tucano",     "Tucano")
 ]
