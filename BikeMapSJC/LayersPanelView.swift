@@ -5,6 +5,7 @@ struct LayersPanelView: View {
     @State private var showFurtoAlert    = false
     @State private var showAcidenteAlert = false
     @State private var showTypePicker    = false
+    @AppStorage("hasSeenIntro") private var hasSeenIntro = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -72,6 +73,13 @@ struct LayersPanelView: View {
                     actionRow("Ocultar tudo", icon: "eye.slash", tint: .secondary) {
                         InfraType.allCases.forEach { appState.layerVisibility[$0.rawValue] = false }
                         POIType.allCases.forEach   { appState.layerVisibility[$0.rawValue] = false }
+                    }
+                    Divider().padding(.leading, 48)
+                    actionRow("Rever introdução", icon: "play.circle.fill", tint: .blue) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            appState.showSidebar = false
+                        }
+                        hasSeenIntro = false
                     }
 
                     if appState.currentUserName != nil {

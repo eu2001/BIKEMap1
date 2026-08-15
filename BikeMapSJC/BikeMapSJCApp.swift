@@ -7,6 +7,7 @@ struct BikeMapSJCApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
     @State private var showSplash = true
+    @AppStorage("hasSeenIntro") private var hasSeenIntro = false
 
     var body: some Scene {
         WindowGroup {
@@ -22,10 +23,17 @@ struct BikeMapSJCApp: App {
                 }
                 .animation(.easeInOut(duration: 0.3), value: appState.currentUserName)
 
+                // First-launch feature walkthrough (shown once)
+                if !hasSeenIntro && !showSplash {
+                    IntroView { hasSeenIntro = true }
+                        .transition(.opacity)
+                        .zIndex(2)
+                }
+
                 if showSplash {
                     SplashView()
                         .transition(.opacity)
-                        .zIndex(1)
+                        .zIndex(3)
                 }
             }
             .animation(.easeInOut(duration: 0.5), value: showSplash)
