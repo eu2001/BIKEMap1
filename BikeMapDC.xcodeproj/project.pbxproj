@@ -271,7 +271,7 @@
 				DEVELOPMENT_TEAM = NJ55MR8TP7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Para mostrar sua localização no mapa e facilitar o planejamento de rotas cicláveis.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Shows your location on the map, helps plan cycling routes, and records the GPS trail while you're capturing a ride.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -304,7 +304,7 @@
 				DEVELOPMENT_TEAM = NJ55MR8TP7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Para mostrar sua localização no mapa e facilitar o planejamento de rotas cicláveis.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Shows your location on the map, helps plan cycling routes, and records the GPS trail while you're capturing a ride.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

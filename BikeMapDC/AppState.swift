@@ -33,6 +33,9 @@ class AppState: ObservableObject {
     @Published var incomingRequests: [(FriendRequestRow, DirectoryProfile)]       = []
     @Published var outgoingRequests: [(FriendRequestRow, DirectoryProfile)]       = []
 
+    // Rides state
+    @Published var rides: [RideRow] = []
+
     var unreadNotificationCount: Int { notifications.filter { !$0.isRead }.count }
 
     // MARK: - Layer visibility
@@ -418,6 +421,126 @@ class AppState: ObservableObject {
         try await supabase.from("friend_requests")
             .delete().eq("id", value: friend.requestId).execute()
         await MainActor.run { self.friends.removeAll { $0.friendId == friend.friendId } }
+    }
+
+    // MARK: - Rides
+
+    func fetchRides() async {
+        guard let uid = currentUserId else { return }
+        do {
+            let rows: [RideRow] = try await supabase
+                .from("rides")
+                .select()
+                .eq("user_id", value: uid)
+                .order("started_at", ascending: false)
+                .execute()
+                .value
+            await MainActor.run { self.rides = rows }
+        } catch {
+            print("fetchRides error: \(error)")
+        }
+    }
+
+    func saveRide(title: String,
+                  startedAt: Date, endedAt: Date,
+                  distanceM: Double, durationS: Int,
+                  visibility: RideVisibility,
+                  points: [RidePoint]) async throws {
+        guard let uid = currentUserId else {
+            throw AppError.message("Sign in to save rides.")
+        }
+
+        struct InsertRide: Encodable {
+            let user_id: UUID
+            let title: String
+            let started_at: String
+            let ended_at: String
+            let distance_m: Double
+            let duration_s: Int
+            let visibility: String
+        }
+        struct InsertedRide: Decodable {
+            let id: UUID
+        }
+
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let inserted: InsertedRide = try await supabase.from("rides")
+            .insert(InsertRide(
+                user_id: uid,
+                title: title.trimmingCharacters(in: .whitespaces),
+                started_at: iso.string(from: startedAt),
+                ended_at: iso.string(from: endedAt),
+                distance_m: distanceM,
+                duration_s: durationS,
+                visibility: visibility.rawValue))
+            .select("id")
+            .single()
+            .execute()
+            .value
+
+        if !points.isEmpty {
+            struct InsertPoint: Encodable {
+                let ride_id: UUID
+                let seq: Int
+                let lat: Double
+                let lng: Double
+                let speed_mps: Double?
+                let ts: String
+            }
+            let rows = points.map { p in
+                InsertPoint(ride_id: inserted.id,
+                            seq: p.seq,
+                            lat: p.lat, lng: p.lng,
+                            speed_mps: p.speedMps,
+                            ts: iso.string(from: p.ts))
+            }
+            // Batch in chunks to avoid enormous single payloads.
+            let chunkSize = 500
+            for start in stride(from: 0, to: rows.count, by: chunkSize) {
+                let end = min(start + chunkSize, rows.count)
+                try await supabase.from("ride_points")
+                    .insert(Array(rows[start..<end]))
+                    .execute()
+            }
+        }
+
+        await fetchRides()
+    }
+
+    func fetchRidePoints(_ ride: RideRow) async -> [RidePoint] {
+        do {
+            let rows: [RidePoint] = try await supabase
+                .from("ride_points")
+                .select()
+                .eq("ride_id", value: ride.id)
+                .order("seq", ascending: true)
+                .execute()
+                .value
+            return rows
+        } catch {
+            print("fetchRidePoints error: \(error)")
+            return []
+        }
+    }
+
+    func updateRideVisibility(_ ride: RideRow, to visibility: RideVisibility) async throws {
+        try await supabase.from("rides")
+            .update(["visibility": visibility.rawValue])
+            .eq("id", value: ride.id)
+            .execute()
+        await MainActor.run {
+            if let idx = self.rides.firstIndex(where: { $0.id == ride.id }) {
+                self.rides[idx].visibility = visibility.rawValue
+            }
+        }
+    }
+
+    func deleteRide(_ ride: RideRow) async throws {
+        try await supabase.from("rides")
+            .delete().eq("id", value: ride.id).execute()
+        await MainActor.run { self.rides.removeAll { $0.id == ride.id } }
     }
 
     // MARK: - POI reports (user flags a bad point for moderator review)

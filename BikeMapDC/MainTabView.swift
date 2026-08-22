@@ -223,23 +223,4 @@ struct NotificationsListView: View {
 }
 
 
-// MARK: - Rides tab (placeholder — real UI lands in the Rides commit)
-
-struct RidesTabView: View {
-    @ObservedObject var appState: AppState
-
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView {
-                Label("Rides coming soon", systemImage: "figure.outdoor.cycle")
-            } description: {
-                Text("Record a ride, save the GPS trail, and see it beside your past rides. Landing shortly.")
-            }
-            .navigationTitle("Rides")
-        }
-    }
-}
-
-
-// FriendsTabView lives in FriendsView.swift (real implementation).
-// RidesTabView placeholder above will be replaced in the Rides commit.
+// FriendsTabView lives in FriendsView.swift; RidesTabView lives in RidesView.swift.
