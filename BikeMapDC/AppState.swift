@@ -292,6 +292,24 @@ class AppState: ObservableObject {
         }
     }
 
+    // MARK: - POI reports (user flags a bad point for moderator review)
+
+    func reportPOI(_ poi: POI, reason: String, details: String) async throws {
+        guard let userId = currentUserId else {
+            throw AppError.message("Sign in to report a point.")
+        }
+        struct InsertReport: Encodable {
+            let poi_id: String
+            let reporter_id: UUID
+            let reason: String
+            let details: String
+        }
+        try await supabase.from("poi_reports").insert(
+            InsertReport(poi_id: poi.id, reporter_id: userId,
+                         reason: reason, details: details)
+        ).execute()
+    }
+
     // MARK: - User POIs
 
     func fetchUserPOIs() async {

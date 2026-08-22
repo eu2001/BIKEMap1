@@ -221,6 +221,27 @@ struct ContentView: View {
 
     private var floatingControls: some View {
         VStack(spacing: 10) {
+            // Primary action: quick-add a bike rack
+            Button {
+                appState.pendingPOIType = .paraciclo
+                appState.mapPickingMode = .addPoint
+                if appState.showSidebar {
+                    withAnimation { appState.showSidebar = false }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "bicycle")
+                        .font(.subheadline.weight(.bold))
+                    Image(systemName: "plus")
+                        .font(.caption.weight(.bold))
+                }
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 44)
+                .background(Color.blue, in: RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+            }
+            .accessibilityLabel("Add bike rack")
+
             mapButton(icon: "location.fill") {
                 locationManager.requestLocation()
                 appState.shouldCenterOnUser = true
@@ -365,6 +386,9 @@ struct POIDetailView: View {
     @ObservedObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showDirections = false
+    @State private var showReport     = false
+
     var body: some View {
         NavigationStack {
             List {
@@ -377,6 +401,19 @@ struct POIDetailView: View {
                         }
                     }
                     .padding(.vertical, 4)
+                }
+
+                // Primary action: directions
+                Section {
+                    Button {
+                        showDirections = true
+                    } label: {
+                        Label("How to get there", systemImage: "arrow.triangle.turn.up.right.diamond.fill")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .listRowBackground(Color.blue)
+                    .foregroundStyle(.white)
                 }
 
                 if !poi.description.isEmpty {
@@ -402,6 +439,20 @@ struct POIDetailView: View {
                     Label("By: \(poi.author == "admin" ? "BikeMap Team" : poi.author)", systemImage: "person.circle")
                 }
 
+                // Secondary action: report bad point
+                if appState.currentUserId != nil {
+                    Section {
+                        Button(role: .destructive) {
+                            showReport = true
+                        } label: {
+                            Label("Report this point", systemImage: "flag.fill")
+                                .font(.subheadline)
+                        }
+                    } footer: {
+                        Text("Flag this point if it doesn't exist, is in the wrong place, or shouldn't be on the map.")
+                            .font(.caption)
+                    }
+                }
             }
             .navigationTitle("Map Point")
             .navigationBarTitleDisplayMode(.inline)
@@ -410,8 +461,14 @@ struct POIDetailView: View {
                     Button("Close") { dismiss() }
                 }
             }
+            .sheet(isPresented: $showDirections) {
+                DirectionsSheet(poi: poi)
+            }
+            .sheet(isPresented: $showReport) {
+                PointReportSheet(poi: poi, appState: appState)
+            }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 }
 
