@@ -28,6 +28,11 @@ class AppState: ObservableObject {
     @Published var infraFeatures:  [BikeInfraFeature] = []
     @Published var notifications:  [NotificationRow]  = []
 
+    // Friends state
+    @Published var friends:          [FriendRow]                                  = []
+    @Published var incomingRequests: [(FriendRequestRow, DirectoryProfile)]       = []
+    @Published var outgoingRequests: [(FriendRequestRow, DirectoryProfile)]       = []
+
     var unreadNotificationCount: Int { notifications.filter { !$0.isRead }.count }
 
     // MARK: - Layer visibility
@@ -290,6 +295,129 @@ class AppState: ObservableObject {
                 }
             }
         }
+    }
+
+    // MARK: - Friends
+
+    func refreshFriendState() async {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.fetchFriends() }
+            group.addTask { await self.fetchFriendRequests() }
+        }
+    }
+
+    func fetchFriends() async {
+        guard currentUserId != nil else { return }
+        do {
+            let rows: [FriendRow] = try await supabase
+                .from("my_friends")
+                .select()
+                .order("username", ascending: true)
+                .execute()
+                .value
+            await MainActor.run { self.friends = rows }
+        } catch {
+            print("fetchFriends error: \(error)")
+        }
+    }
+
+    func fetchFriendRequests() async {
+        guard let uid = currentUserId else { return }
+        do {
+            let rows: [FriendRequestRow] = try await supabase
+                .from("friend_requests")
+                .select()
+                .eq("status", value: "pending")
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+
+            // Split by direction; look up the OTHER party's profile once per unique id.
+            let incoming = rows.filter { $0.addresseeId == uid }
+            let outgoing = rows.filter { $0.requesterId == uid }
+            let profileIds = Set(incoming.map(\.requesterId) + outgoing.map(\.addresseeId))
+            let profiles = try await fetchDirectoryProfiles(ids: Array(profileIds))
+            let byId = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
+
+            let inPairs  = incoming.compactMap { req in
+                byId[req.requesterId].map { (req, $0) }
+            }
+            let outPairs = outgoing.compactMap { req in
+                byId[req.addresseeId].map { (req, $0) }
+            }
+            await MainActor.run {
+                self.incomingRequests = inPairs
+                self.outgoingRequests = outPairs
+            }
+        } catch {
+            print("fetchFriendRequests error: \(error)")
+        }
+    }
+
+    private func fetchDirectoryProfiles(ids: [UUID]) async throws -> [DirectoryProfile] {
+        guard !ids.isEmpty else { return [] }
+        return try await supabase
+            .from("profiles")
+            .select("id, username, avatar, contribution_count")
+            .in("id", values: ids.map { $0.uuidString })
+            .execute()
+            .value
+    }
+
+    func searchProfiles(byUsername query: String) async throws -> [DirectoryProfile] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard q.count >= 2 else { return [] }
+        return try await supabase
+            .from("profiles")
+            .select("id, username, avatar, contribution_count")
+            .ilike("username", pattern: "%\(q)%")
+            .order("contribution_count", ascending: false)
+            .limit(20)
+            .execute()
+            .value
+    }
+
+    func sendFriendRequest(to addressee: UUID) async throws {
+        guard let uid = currentUserId else {
+            throw AppError.message("Sign in to add friends.")
+        }
+        guard uid != addressee else {
+            throw AppError.message("You can't friend yourself.")
+        }
+        struct Insert: Encodable {
+            let requester_id: UUID
+            let addressee_id: UUID
+        }
+        try await supabase.from("friend_requests")
+            .insert(Insert(requester_id: uid, addressee_id: addressee))
+            .execute()
+        await fetchFriendRequests()
+    }
+
+    func respondToFriendRequest(_ request: FriendRequestRow, accept: Bool) async throws {
+        let status = accept ? "accepted" : "rejected"
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        try await supabase.from("friend_requests")
+            .update([
+                "status": status,
+                "responded_at": formatter.string(from: Date())
+            ])
+            .eq("id", value: request.id)
+            .execute()
+        await refreshFriendState()
+    }
+
+    func cancelFriendRequest(_ request: FriendRequestRow) async throws {
+        try await supabase.from("friend_requests")
+            .delete().eq("id", value: request.id).execute()
+        await fetchFriendRequests()
+    }
+
+    func removeFriend(_ friend: FriendRow) async throws {
+        try await supabase.from("friend_requests")
+            .delete().eq("id", value: friend.requestId).execute()
+        await MainActor.run { self.friends.removeAll { $0.friendId == friend.friendId } }
     }
 
     // MARK: - POI reports (user flags a bad point for moderator review)

@@ -241,19 +241,5 @@ struct RidesTabView: View {
 }
 
 
-// MARK: - Friends tab (placeholder — real UI lands in the Friends commit)
-
-struct FriendsTabView: View {
-    @ObservedObject var appState: AppState
-
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView {
-                Label("Friends coming soon", systemImage: "person.2.fill")
-            } description: {
-                Text("Add friends, see their contributions, and share your favorite routes. Landing shortly.")
-            }
-            .navigationTitle("Friends")
-        }
-    }
-}
+// FriendsTabView lives in FriendsView.swift (real implementation).
+// RidesTabView placeholder above will be replaced in the Rides commit.
