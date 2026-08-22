@@ -12,8 +12,8 @@ struct BikeMapDCApp: App {
         WindowGroup {
             ZStack {
                 Group {
-                    if appState.currentUserName != nil {
-                        ContentView(appState: appState)
+                    if appState.currentUserName != nil || appState.guestAccess {
+                        MainTabView(appState: appState)
                             .transition(.opacity)
                     } else {
                         WelcomeView(appState: appState)
