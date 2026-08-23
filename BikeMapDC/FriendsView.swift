@@ -335,6 +335,8 @@ struct FriendDetailView: View {
     let friend: FriendRow
     @ObservedObject var appState: AppState
 
+    @State private var showSendBadge = false
+
     var body: some View {
         List {
             Section {
@@ -358,6 +360,21 @@ struct FriendDetailView: View {
             }
 
             Section {
+                Button {
+                    showSendBadge = true
+                } label: {
+                    Label("Enviar distintivo", systemImage: "rosette")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                }
+                .listRowBackground(Color.blue)
+                .foregroundStyle(.white)
+            } footer: {
+                Text("Reconheça um amigo com um distintivo — força na subida, madrugador, mão-boa de bike…")
+                    .font(.caption)
+            }
+
+            Section {
                 Button(role: .destructive) {
                     Task { try? await appState.removeFriend(friend) }
                 } label: {
@@ -367,5 +384,8 @@ struct FriendDetailView: View {
         }
         .navigationTitle(friend.username)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showSendBadge) {
+            SendBadgeSheet(friend: friend, appState: appState)
+        }
     }
 }

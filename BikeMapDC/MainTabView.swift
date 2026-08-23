@@ -113,6 +113,20 @@ struct ProfileTabView: View {
                     } label: {
                         Label("Community Ranking", systemImage: "trophy.fill")
                     }
+
+                    NavigationLink {
+                        MyBadgesView(appState: appState)
+                    } label: {
+                        HStack {
+                            Label("Meus Distintivos", systemImage: "rosette")
+                            Spacer()
+                            if !appState.receivedBadges.isEmpty {
+                                Text("\(appState.receivedBadges.count)")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
 
                 if appState.isAdmin {
@@ -153,7 +167,10 @@ struct ProfileTabView: View {
                     appState.logout()
                 }
             }
-            .task { await appState.fetchBikes() }
+            .task {
+                await appState.fetchBikes()
+                await appState.fetchReceivedBadges()
+            }
         }
     }
 }
@@ -181,9 +198,9 @@ struct NotificationsListView: View {
                             appState.openNotification(n)
                         } label: {
                             HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: n.type == "furto_alert" ? "lock.open.fill" : "checkmark.seal.fill")
+                                Image(systemName: iconName(for: n.type))
                                     .font(.title3)
-                                    .foregroundStyle(n.type == "furto_alert" ? .red : .green)
+                                    .foregroundStyle(iconColor(for: n.type))
                                     .frame(width: 32)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(n.title).font(.subheadline.weight(.semibold))
@@ -219,6 +236,28 @@ struct NotificationsListView: View {
             }
         }
         .task { await appState.fetchNotifications() }
+    }
+
+    private func iconName(for type: String) -> String {
+        switch type {
+        case "furto_alert":     return "lock.open.fill"
+        case "poi_approved":    return "checkmark.seal.fill"
+        case "badge_received":  return "rosette"
+        case "friend_request":  return "person.badge.plus"
+        case "friend_accepted": return "person.2.fill"
+        default:                return "bell.fill"
+        }
+    }
+
+    private func iconColor(for type: String) -> Color {
+        switch type {
+        case "furto_alert":     return .red
+        case "poi_approved":    return .green
+        case "badge_received":  return .yellow
+        case "friend_request":  return .blue
+        case "friend_accepted": return .blue
+        default:                return .secondary
+        }
     }
 }
 

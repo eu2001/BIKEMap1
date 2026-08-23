@@ -36,6 +36,9 @@ class AppState: ObservableObject {
     // Rides state
     @Published var rides: [RideRow] = []
 
+    // Badges the current user has received
+    @Published var receivedBadges: [ReceivedBadge] = []
+
     var unreadNotificationCount: Int { notifications.filter { !$0.isRead }.count }
 
     // MARK: - Layer visibility
@@ -421,6 +424,61 @@ class AppState: ObservableObject {
         try await supabase.from("friend_requests")
             .delete().eq("id", value: friend.requestId).execute()
         await MainActor.run { self.friends.removeAll { $0.friendId == friend.friendId } }
+    }
+
+    // MARK: - Badges
+
+    func sendBadge(to userId: UUID, slug: String, message: String) async throws {
+        guard let uid = currentUserId else {
+            throw AppError.message("Sign in to send badges.")
+        }
+        guard uid != userId else {
+            throw AppError.message("Can't send a badge to yourself.")
+        }
+        struct InsertBadge: Encodable {
+            let from_user_id: UUID
+            let to_user_id: UUID
+            let slug: String
+            let message: String
+        }
+        try await supabase.from("badges").insert(
+            InsertBadge(from_user_id: uid, to_user_id: userId,
+                        slug: slug, message: message)
+        ).execute()
+    }
+
+    func fetchReceivedBadges() async {
+        guard let uid = currentUserId else { return }
+        do {
+            let rows: [BadgeRow] = try await supabase
+                .from("badges")
+                .select()
+                .eq("to_user_id", value: uid)
+                .order("created_at", ascending: false)
+                .limit(200)
+                .execute()
+                .value
+
+            // Resolve senders in one lookup for efficiency
+            let senderIds = Set(rows.map(\.fromUserId))
+            let senders = try await fetchDirectoryProfiles(ids: Array(senderIds))
+            let byId = Dictionary(uniqueKeysWithValues: senders.map { ($0.id, $0) })
+
+            let joined = rows.map { r in
+                ReceivedBadge(row: r, sender: byId[r.fromUserId])
+            }
+            await MainActor.run { self.receivedBadges = joined }
+        } catch {
+            print("fetchReceivedBadges error: \(error)")
+        }
+    }
+
+    func removeReceivedBadge(_ badge: BadgeRow) async throws {
+        try await supabase.from("badges")
+            .delete().eq("id", value: badge.id).execute()
+        await MainActor.run {
+            self.receivedBadges.removeAll { $0.row.id == badge.id }
+        }
     }
 
     // MARK: - Rides
