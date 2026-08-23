@@ -17,6 +17,31 @@ struct AuthView: View {
         NavigationStack {
             List {
 
+                // MARK: Notifications
+                if !appState.notifications.isEmpty {
+                    Section {
+                        ForEach(appState.notifications) { notification in
+                            notificationRow(notification)
+                        }
+                    } header: {
+                        HStack {
+                            Text("Notifications")
+                            if appState.unreadNotificationCount > 0 {
+                                Text("(\(appState.unreadNotificationCount) new)")
+                                    .foregroundStyle(.red)
+                            }
+                            Spacer()
+                            if appState.unreadNotificationCount > 0 {
+                                Button("Mark as read") {
+                                    Task { await appState.markAllNotificationsRead() }
+                                }
+                                .font(.caption)
+                                .textCase(nil)
+                            }
+                        }
+                    }
+                }
+
                 // MARK: Profile header
                 if let profile = appState.currentProfile {
                     Section {
@@ -25,7 +50,7 @@ struct AuthView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(profile.username).font(.headline)
                                 if profile.isPremium {
-                                    Label("Membro Premium", systemImage: "star.fill")
+                                    Label("Premium Member", systemImage: "star.fill")
                                         .font(.caption).foregroundStyle(.orange)
                                 }
                             }
@@ -74,10 +99,25 @@ struct AuthView: View {
                     }
                 }
 
-                // MARK: Minhas Bikes
+                // MARK: Admin panel (only for admins) — surfaced first so admins
+                // can reach the review queue right after their name/avatar.
+                if appState.isAdmin {
+                    Section {
+                        Button {
+                            showAdmin = true
+                        } label: {
+                            Label("Admin Panel", systemImage: "shield.lefthalf.filled")
+                                .foregroundStyle(.purple)
+                        }
+                    } header: {
+                        Text("Administration")
+                    }
+                }
+
+                // MARK: My Bikes
                 Section {
                     if !hasBikes {
-                        Text("Guarde as informações da sua bike. Em caso de roubo, você terá todos os dados para ajudar na recuperação e alertar a comunidade.")
+                        Text("Save your bike's details. If it's ever stolen, you'll have everything you need to help recover it and alert the community.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -93,7 +133,7 @@ struct AuthView: View {
                         showAddBike = true
                     } label: {
                         Label(
-                            hasBikes ? "Adicionar novas bikes" : "Registrar sua magrela",
+                            hasBikes ? "Add another bike" : "Register your bike",
                             systemImage: hasBikes ? "plus.circle.fill" : "bicycle"
                         )
                         .font(.subheadline.weight(.semibold))
@@ -105,13 +145,13 @@ struct AuthView: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(.init(top: 4, leading: 12, bottom: 6, trailing: 12))
                 } header: {
-                    Text("Minhas bikes (\(appState.bikes.count))")
+                    Text("My bikes (\(appState.bikes.count))")
                 }
 
-                // MARK: Estatísticas + Pontos contribuídos (unified)
-                Section("Contribuições (\(appState.userPOIs.count))") {
+                // MARK: Stats + Contributed points (unified)
+                Section("Contributions (\(appState.userPOIs.count))") {
                     if let profile = appState.currentProfile {
-                        LabeledContent("Total de pontos", value: "\(profile.contributionCount)")
+                        LabeledContent("Total points", value: "\(profile.contributionCount)")
                     }
                     ForEach(appState.userPOIs) { poi in
                         HStack(spacing: 12) {
@@ -145,41 +185,28 @@ struct AuthView: View {
                     }
                 }
 
-                // MARK: Admin panel (only for admins)
-                if appState.isAdmin {
-                    Section {
-                        Button {
-                            showAdmin = true
-                        } label: {
-                            Label("Painel do Administrador", systemImage: "shield.lefthalf.filled")
-                                .foregroundStyle(.purple)
-                        }
-                    } header: {
-                        Text("Administração")
-                    }
-                }
-
                 // MARK: Logout
                 Section {
                     Button(role: .destructive) {
                         appState.logout()
                         dismiss()
                     } label: {
-                        Label("Sair da conta", systemImage: "rectangle.portrait.and.arrow.right")
+                        Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                 }
             }
-            .navigationTitle("Meu Perfil")
+            .navigationTitle("My Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fechar") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
             }
             .task {
                 loadingBikes = true
                 await appState.fetchBikes()
                 await appState.fetchUserPOIs()
+                await appState.fetchNotifications()
                 loadingBikes = false
             }
             .sheet(isPresented: $showAddBike) {
@@ -194,23 +221,70 @@ struct AuthView: View {
             .sheet(isPresented: $showAdmin) {
                 AdminView(appState: appState)
             }
-            .alert("Remover bike?", isPresented: .init(
+            .alert("Delete bike?", isPresented: .init(
                 get: { deletingBike != nil },
                 set: { if !$0 { deletingBike = nil } }
             )) {
-                Button("Cancelar", role: .cancel) { deletingBike = nil }
-                Button("Remover", role: .destructive) {
+                Button("Cancel", role: .cancel) { deletingBike = nil }
+                Button("Delete", role: .destructive) {
                     if let bike = deletingBike {
                         Task { try? await appState.deleteBike(bike) }
                         deletingBike = nil
                     }
                 }
             } message: {
-                Text("Tem certeza que deseja remover \"\(deletingBike?.nickname ?? "")\"?")
+                Text("Are you sure you want to delete \"\(deletingBike?.nickname ?? "")\"?")
             }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+
+    // MARK: - Notification row
+
+    private func notificationRow(_ notification: NotificationRow) -> some View {
+        Button {
+            appState.openNotification(notification)
+            dismiss()
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: notification.type == "furto_alert" ? "exclamationmark.triangle.fill" : "checkmark.seal.fill")
+                    .font(.title3)
+                    .foregroundStyle(notification.type == "furto_alert" ? .red : .green)
+                    .frame(width: 32, height: 32)
+                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(notification.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        if !notification.isRead {
+                            Circle().fill(Color.red).frame(width: 8, height: 8)
+                        }
+                    }
+                    if let body = notification.body, !body.isEmpty {
+                        Text(body)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    if let date = notification.createdAt {
+                        Text(date.formatted(.relative(presentation: .named)))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                Spacer()
+                if notification.poiId != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Bike row
@@ -245,7 +319,7 @@ struct AuthView: View {
                     if !bike.aro.isEmpty   { Text("· \(bike.aro)").font(.caption).foregroundStyle(.secondary) }
                 }
                 if !bike.serialNumber.isEmpty {
-                    Text("Nº série: \(bike.serialNumber)")
+                    Text("Serial #: \(bike.serialNumber)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -262,10 +336,10 @@ struct AuthView: View {
             // Edit / delete menu
             Menu {
                 Button { editingBike = bike } label: {
-                    Label("Editar", systemImage: "pencil")
+                    Label("Edit", systemImage: "pencil")
                 }
                 Button(role: .destructive) { deletingBike = bike } label: {
-                    Label("Remover", systemImage: "trash")
+                    Label("Delete", systemImage: "trash")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")

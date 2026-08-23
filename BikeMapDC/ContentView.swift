@@ -34,7 +34,7 @@ struct ContentView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "wifi.slash")
                             .font(.subheadline.weight(.semibold))
-                        Text("Sem conexão — o mapa pode estar desatualizado")
+                        Text("Offline — the map may be out of date")
                             .font(.caption.weight(.medium))
                     }
                     .foregroundStyle(.white)
@@ -187,14 +187,23 @@ struct ContentView: View {
                     AvatarView(id: appState.currentUser?.avatar ?? "capivara", size: 38)
                 }
                 .overlay(alignment: .topTrailing) {
-                    if appState.currentUser?.isPremium == true {
+                    if appState.unreadNotificationCount > 0 {
+                        Text("\(appState.unreadNotificationCount)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(minWidth: 16, minHeight: 16)
+                            .padding(.horizontal, 3)
+                            .background(Color.red, in: Capsule())
+                            .overlay(Capsule().stroke(Color.white, lineWidth: 1.5))
+                            .offset(x: 6, y: -6)
+                    } else if appState.currentUser?.isPremium == true {
                         Text("⭐").font(.system(size: 10)).offset(x: 4, y: -4)
                     }
                 }
                 let _ = name  // suppress warning
             } else {
                 Button { appState.showAuth = true } label: {
-                    Text("Entrar")
+                    Text("Sign in")
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .padding(.horizontal, 12)
@@ -212,6 +221,27 @@ struct ContentView: View {
 
     private var floatingControls: some View {
         VStack(spacing: 10) {
+            // Primary action: quick-add a bike rack
+            Button {
+                appState.pendingPOIType = .paraciclo
+                appState.mapPickingMode = .addPoint
+                if appState.showSidebar {
+                    withAnimation { appState.showSidebar = false }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "bicycle")
+                        .font(.subheadline.weight(.bold))
+                    Image(systemName: "plus")
+                        .font(.caption.weight(.bold))
+                }
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 44)
+                .background(Color.blue, in: RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+            }
+            .accessibilityLabel("Add bike rack")
+
             mapButton(icon: "location.fill") {
                 locationManager.requestLocation()
                 appState.shouldCenterOnUser = true
@@ -247,7 +277,7 @@ struct ContentView: View {
                 Image(systemName: "hand.tap.fill").foregroundStyle(.white)
                 Text(pickingModeLabel).foregroundStyle(.white).font(.subheadline).fontWeight(.medium)
                 Spacer()
-                Button("Cancelar") {
+                Button("Cancel") {
                     appState.mapPickingMode = nil
                 }
                 .foregroundStyle(.white.opacity(0.85))
@@ -265,7 +295,7 @@ struct ContentView: View {
 
     private var pickingModeLabel: String {
         switch appState.mapPickingMode {
-        case .addPoint: return "Toque no mapa para adicionar um ponto"
+        case .addPoint: return "Tap the map to add a point"
         case .none:     return ""
         }
     }
@@ -299,7 +329,7 @@ struct LegendView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Legenda").font(.headline)
+                Text("Legend").font(.headline)
                 Spacer()
                 Button { withAnimation { appState.showLegend = false } } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
@@ -307,7 +337,7 @@ struct LegendView: View {
             }
             .padding(.bottom, 4)
 
-            Text("Infraestrutura").font(.caption).foregroundStyle(.secondary).fontWeight(.semibold)
+            Text("Infrastructure").font(.caption).foregroundStyle(.secondary).fontWeight(.semibold)
             ForEach(InfraType.allCases, id: \.rawValue) { type in
                 HStack(spacing: 8) {
                     legendLine(color: type.color, dashed: type.dashPattern != nil)
@@ -317,7 +347,7 @@ struct LegendView: View {
 
             Divider().padding(.vertical, 4)
 
-            Text("Pontos de Interesse").font(.caption).foregroundStyle(.secondary).fontWeight(.semibold)
+            Text("Points of Interest").font(.caption).foregroundStyle(.secondary).fontWeight(.semibold)
             let poiRows = POIType.allCases.chunked(into: 2)
             ForEach(0..<poiRows.count, id: \.self) { row in
                 HStack(spacing: 12) {
@@ -356,6 +386,9 @@ struct POIDetailView: View {
     @ObservedObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showDirections = false
+    @State private var showReport     = false
+
     var body: some View {
         NavigationStack {
             List {
@@ -370,13 +403,26 @@ struct POIDetailView: View {
                     .padding(.vertical, 4)
                 }
 
+                // Primary action: directions
+                Section {
+                    Button {
+                        showDirections = true
+                    } label: {
+                        Label("How to get there", systemImage: "arrow.triangle.turn.up.right.diamond.fill")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .listRowBackground(Color.blue)
+                    .foregroundStyle(.white)
+                }
+
                 if !poi.description.isEmpty {
-                    Section("Descrição") {
+                    Section("Description") {
                         Text(poi.description)
                     }
                 }
 
-                Section("Localização") {
+                Section("Location") {
                     HStack {
                         Label("Lat", systemImage: "location").font(.caption)
                         Spacer()
@@ -389,20 +435,40 @@ struct POIDetailView: View {
                     }
                 }
 
-                Section("Contribuição") {
-                    Label("Por: \(poi.author == "admin" ? "Equipe BikeMap" : poi.author)", systemImage: "person.circle")
+                Section("Contribution") {
+                    Label("By: \(poi.author == "admin" ? "BikeMap Team" : poi.author)", systemImage: "person.circle")
                 }
 
+                // Secondary action: report bad point
+                if appState.currentUserId != nil {
+                    Section {
+                        Button(role: .destructive) {
+                            showReport = true
+                        } label: {
+                            Label("Report this point", systemImage: "flag.fill")
+                                .font(.subheadline)
+                        }
+                    } footer: {
+                        Text("Flag this point if it doesn't exist, is in the wrong place, or shouldn't be on the map.")
+                            .font(.caption)
+                    }
+                }
             }
-            .navigationTitle("Ponto no Mapa")
+            .navigationTitle("Map Point")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fechar") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
             }
+            .sheet(isPresented: $showDirections) {
+                DirectionsSheet(poi: poi)
+            }
+            .sheet(isPresented: $showReport) {
+                PointReportSheet(poi: poi, appState: appState)
+            }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 }
 

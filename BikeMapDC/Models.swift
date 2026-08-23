@@ -44,12 +44,12 @@ enum InfraType: String, CaseIterable, Codable {
 
     var label: String {
         switch self {
-        case .ciclovia:         return "Ciclovia"
-        case .ciclofaixa:       return "Ciclofaixa"
-        case .compartilhada:    return "Via Compartilhada"
-        case .rota_alternativa: return "Rota Alternativa"
-        case .proibida:         return "Via Proibida"
-        case .planejada:        return "Planejada / Em Obras"
+        case .ciclovia:         return "Protected Bike Lane"
+        case .ciclofaixa:       return "Bike Lane"
+        case .compartilhada:    return "Shared Roadway"
+        case .rota_alternativa: return "Alternative Route"
+        case .proibida:         return "No Cycling Allowed"
+        case .planejada:        return "Planned / Under Construction"
         }
     }
 }
@@ -71,6 +71,7 @@ struct BikeInfraFeature {
 enum POIType: String, CaseIterable, Codable {
     case paraciclo, bike_sharing, loja, reparo, bomba, chuveiro, furto
     case acidente_ferido, acidente_morte
+    case restroom
 
     var emoji: String {
         switch self {
@@ -83,20 +84,22 @@ enum POIType: String, CaseIterable, Codable {
         case .acidente_morte:  return "❌"
         case .bike_sharing:    return "🚴‍♂️"
         case .furto:           return "🔓"
+        case .restroom:        return "🚻"
         }
     }
 
     var label: String {
         switch self {
-        case .paraciclo:       return "Paraciclo / Bicicletário"
-        case .bike_sharing:    return "Estação de Bike Compartilhada"
-        case .loja:            return "Loja de Bikes"
-        case .reparo:          return "Pontos de Reparo"
-        case .bomba:           return "Bombas de Ar"
-        case .chuveiro:        return "Chuveiro / Vestiário"
-        case .furto:           return "Furtos de Bicicleta"
-        case .acidente_ferido: return "Acidentes com Ciclistas"
-        case .acidente_morte:  return "Acidentes Fatais"
+        case .paraciclo:       return "Bike Rack"
+        case .bike_sharing:    return "Bikeshare Station"
+        case .loja:            return "Bike Shop"
+        case .reparo:          return "Fix-It Stand"
+        case .bomba:           return "Air Pump"
+        case .chuveiro:        return "Shower / Locker Room"
+        case .furto:           return "Stolen Bikes"
+        case .acidente_ferido: return "Cyclist Crashes"
+        case .acidente_morte:  return "Fatal Crashes"
+        case .restroom:        return "Public Restroom"
         }
     }
 
@@ -111,6 +114,7 @@ enum POIType: String, CaseIterable, Codable {
         case .acidente_morte:  return .init(red: 0.863, green: 0.149, blue: 0.149, alpha: 1)
         case .bike_sharing:    return .init(red: 0.486, green: 0.227, blue: 0.933, alpha: 1)
         case .furto:           return .init(red: 0.294, green: 0.337, blue: 0.412, alpha: 1)
+        case .restroom:        return .init(red: 0.345, green: 0.420, blue: 0.831, alpha: 1)
         }
     }
 
@@ -118,7 +122,7 @@ enum POIType: String, CaseIterable, Codable {
 
     var canContribute: Bool {
         switch self {
-        case .paraciclo, .loja, .reparo, .bomba, .chuveiro, .furto, .acidente_ferido: return true
+        case .paraciclo, .loja, .reparo, .bomba, .chuveiro, .furto, .acidente_ferido, .restroom: return true
         default: return false
         }
     }
@@ -190,9 +194,9 @@ struct AvatarView: View {
 }
 
 let avatarList: [(id: String, name: String)] = [
-    ("tucano",   "Tucano"),
-    ("capivara", "Capivara"),
+    ("tucano",   "Toucan"),
+    ("capivara", "Capybara"),
     ("muiriqui", "Muriqui"),
-    ("preguica", "Preguiça"),
-    ("gamba",    "Gambá")
+    ("preguica", "Sloth"),
+    ("gamba",    "Opossum")
 ]

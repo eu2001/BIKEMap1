@@ -28,10 +28,10 @@ struct WelcomeView: View {
                         .padding(.bottom, 16)
 
                     VStack(spacing: 4) {
-                        Text("BikeMap SJC")
+                        Text("BikeMap DC")
                             .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
-                        Text("Mapa Cicloviário de SJC")
+                        Text("DC Bike Infrastructure Map")
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                             .foregroundStyle(.secondary)
                     }
@@ -41,8 +41,8 @@ struct WelcomeView: View {
                     VStack(spacing: 0) {
                         // Tab picker
                         Picker("", selection: $tab) {
-                            Text("Entrar").tag(WelcomeTab.login)
-                            Text("Criar conta").tag(WelcomeTab.register)
+                            Text("Sign in").tag(WelcomeTab.login)
+                            Text("Create account").tag(WelcomeTab.register)
                         }
                         .pickerStyle(.segmented)
                         .padding(16)
@@ -68,7 +68,7 @@ struct WelcomeView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "wifi.slash")
                             .font(.subheadline.weight(.semibold))
-                        Text("Sem conexão com a internet")
+                        Text("No internet connection")
                             .font(.caption.weight(.medium))
                     }
                     .foregroundStyle(.white)
@@ -99,16 +99,16 @@ private struct WelcomeLoginForm: View {
     var body: some View {
         VStack(spacing: 14) {
             fieldGroup {
-                styledField("E-mail", text: $email, content: .emailAddress)
+                styledField("Email", text: $email, content: .emailAddress)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                 Divider().padding(.leading, 16)
                 HStack {
                     Group {
                         if showPw {
-                            TextField("Senha", text: $password)
+                            TextField("Password", text: $password)
                         } else {
-                            SecureField("Senha", text: $password)
+                            SecureField("Password", text: $password)
                         }
                     }
                     .textContentType(.password)
@@ -136,7 +136,7 @@ private struct WelcomeLoginForm: View {
                     if loading {
                         ProgressView().tint(.white)
                     } else {
-                        Text("Entrar").fontWeight(.semibold)
+                        Text("Sign in").fontWeight(.semibold)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -180,18 +180,18 @@ private struct WelcomeRegisterForm: View {
     var body: some View {
         VStack(spacing: 14) {
             fieldGroup {
-                styledField("Nome de usuário", text: $username, content: .username)
+                styledField("Username", text: $username, content: .username)
                 Divider().padding(.leading, 16)
-                styledField("E-mail", text: $email, content: .emailAddress)
+                styledField("Email", text: $email, content: .emailAddress)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                 Divider().padding(.leading, 16)
                 HStack {
                     Group {
                         if showPw {
-                            TextField("Senha (mín. 4 caracteres)", text: $password)
+                            TextField("Password (min. 4 characters)", text: $password)
                         } else {
-                            SecureField("Senha (mín. 4 caracteres)", text: $password)
+                            SecureField("Password (min. 4 characters)", text: $password)
                         }
                     }
                     .textContentType(.newPassword)
@@ -207,9 +207,9 @@ private struct WelcomeRegisterForm: View {
                 HStack {
                     Group {
                         if showConfirm {
-                            TextField("Confirmar senha", text: $confirm)
+                            TextField("Confirm password", text: $confirm)
                         } else {
-                            SecureField("Confirmar senha", text: $confirm)
+                            SecureField("Confirm password", text: $confirm)
                         }
                     }
                     .textContentType(.newPassword)
@@ -225,7 +225,7 @@ private struct WelcomeRegisterForm: View {
 
             // Avatar picker
             VStack(alignment: .leading, spacing: 8) {
-                Text("Escolha seu avatar")
+                Text("Choose your avatar")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.leading, 4)
@@ -262,7 +262,7 @@ private struct WelcomeRegisterForm: View {
                     if loading {
                         ProgressView().tint(.white)
                     } else {
-                        Text("Criar conta").fontWeight(.semibold)
+                        Text("Create account").fontWeight(.semibold)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -280,10 +280,10 @@ private struct WelcomeRegisterForm: View {
         error = ""; loading = true
         defer { loading = false }
         let name = username.trimmingCharacters(in: .whitespaces)
-        guard name.count >= 3 else { error = "Nome deve ter ao menos 3 caracteres."; return }
-        guard email.contains("@") && email.contains(".") else { error = "E-mail inválido."; return }
-        guard password.count >= 6 else { error = "Senha deve ter ao menos 6 caracteres."; return }
-        guard password == confirm else { error = "As senhas não coincidem."; return }
+        guard name.count >= 3 else { error = "Name must be at least 3 characters."; return }
+        guard email.contains("@") && email.contains(".") else { error = "Invalid email."; return }
+        guard password.count >= 6 else { error = "Password must be at least 6 characters."; return }
+        guard password == confirm else { error = "Passwords don't match."; return }
         do {
             try await appState.register(email: email.lowercased().trimmingCharacters(in: .whitespaces),
                                          password: password, username: name, avatar: avatar)

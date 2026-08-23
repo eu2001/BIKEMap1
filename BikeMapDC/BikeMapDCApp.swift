@@ -3,7 +3,7 @@ import UserNotifications
 import CoreLocation
 
 @main
-struct BikeMapSJCApp: App {
+struct BikeMapDCApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
     @State private var showSplash = true
@@ -12,8 +12,8 @@ struct BikeMapSJCApp: App {
         WindowGroup {
             ZStack {
                 Group {
-                    if appState.currentUserName != nil {
-                        ContentView(appState: appState)
+                    if appState.currentUserName != nil || appState.guestAccess {
+                        MainTabView(appState: appState)
                             .transition(.opacity)
                     } else {
                         WelcomeView(appState: appState)
@@ -83,7 +83,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         if let latStr = info["lat"] as? String, let lngStr = info["lng"] as? String,
            let lat = Double(latStr), let lng = Double(lngStr) {
             let coord = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-            let title = info["poi_title"] as? String ?? "Furto de Bicicleta"
+            let title = info["poi_title"] as? String ?? "Bike Theft"
             let desc  = info["poi_description"] as? String ?? ""
             let poiId = info["poi_id"] as? String ?? ""
             let poi   = POI(id: poiId, type: POIType.furto.rawValue,

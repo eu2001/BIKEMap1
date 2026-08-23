@@ -15,12 +15,12 @@ struct RankingView: View {
                         .listRowBackground(Color.clear)
                 } else if ranked.isEmpty {
                     ContentUnavailableView(
-                        "Nenhum contribuidor ainda",
+                        "No contributors yet",
                         systemImage: "person.3",
-                        description: Text("Seja o primeiro a adicionar pontos ao mapa!")
+                        description: Text("Be the first to add points to the map!")
                     )
                 } else {
-                    Section("Contribuidores do mapa") {
+                    Section("Map contributors") {
                         ForEach(Array(ranked.enumerated()), id: \.element.username) { index, entry in
                             rankRow(index: index, username: entry.username, profile: entry.profile)
                         }
@@ -30,7 +30,7 @@ struct RankingView: View {
                 if let myName = appState.currentUserName {
                     let myPOIs = appState.pois.filter { $0.author == myName }
                     if !myPOIs.isEmpty {
-                        Section("Meus pontos adicionados") {
+                        Section("My added points") {
                             ForEach(myPOIs.suffix(10).reversed()) { poi in
                                 HStack(spacing: 10) {
                                     Text(poi.poiType.emoji)
@@ -55,7 +55,7 @@ struct RankingView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fechar") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
             }
             .task { await loadRanking() }
@@ -72,8 +72,8 @@ struct RankingView: View {
 
     @ViewBuilder
     private func rankRow(index: Int, username: String, profile: ProfileRow) -> some View {
-        let displayName = username == "admin" ? "Equipe BikeMap" : username
-        let medal: String = index == 0 ? "🥇" : index == 1 ? "🥈" : index == 2 ? "🥉" : "\(index + 1)º"
+        let displayName = username == "admin" ? "BikeMap Team" : username
+        let medal: String = index == 0 ? "🥇" : index == 1 ? "🥈" : index == 2 ? "🥉" : "\(index + 1)"
         let isMe = username == appState.currentUserName
 
         HStack(spacing: 12) {
@@ -86,9 +86,9 @@ struct RankingView: View {
                 HStack(spacing: 4) {
                     Text(displayName).fontWeight(isMe ? .bold : .regular)
                     if profile.isPremium { Text("⭐").font(.caption) }
-                    if isMe { Text("(você)").font(.caption).foregroundStyle(.secondary) }
+                    if isMe { Text("(you)").font(.caption).foregroundStyle(.secondary) }
                 }
-                Text("\(profile.contributionCount) pontos")
+                Text("\(profile.contributionCount) points")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()

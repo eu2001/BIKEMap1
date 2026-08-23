@@ -4,8 +4,8 @@ import Supabase
 // MARK: - Shared client
 
 let supabase = SupabaseClient(
-    supabaseURL: URL(string: "https://rwhwngayniazpruukblm.supabase.co")!,
-    supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3aHduZ2F5bmlhenBydXVrYmxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNDc5MDYsImV4cCI6MjA5MzgyMzkwNn0.ZxJKC-Qfpp9R7mw1tPxEkVYesFA2EgWgJOwJysplxX0"
+    supabaseURL: URL(string: "https://hobulqkujiczaakaucwz.supabase.co")!,
+    supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvYnVscWt1amljemFha2F1Y3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MzkzMDYsImV4cCI6MjA5NDExNTMwNn0.PNNEuLEhLK-H_SthDloN5yJcw_Z1SYTUVxQ6NlfEgcU"
 )
 
 // MARK: - Database row types
@@ -71,4 +71,29 @@ struct POIRow: Codable, Identifiable {
             title: title, description: description,
             author: authorUsername, createdAt: createdAt)
     }
+}
+
+struct NotificationRow: Codable, Identifiable, Hashable {
+    let id: UUID
+    var userId: UUID
+    var type: String
+    var poiId: String?
+    var poiType: String?
+    var title: String
+    var body: String?
+    var lat: Double?
+    var lng: Double?
+    var readAt: Date?
+    var createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, title, body, lat, lng
+        case userId    = "user_id"
+        case poiId     = "poi_id"
+        case poiType   = "poi_type"
+        case readAt    = "read_at"
+        case createdAt = "created_at"
+    }
+
+    var isRead: Bool { readAt != nil }
 }

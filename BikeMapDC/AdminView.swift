@@ -8,28 +8,29 @@ struct AdminView: View {
     @State private var pendingPOIs: [POI] = []
     @State private var loading      = true
     @State private var processingId: String? = nil
+    @State private var rejectingPOI: POI?    = nil
 
     var body: some View {
         NavigationStack {
             Group {
                 if loading {
-                    ProgressView("Carregando pontos pendentes...")
+                    ProgressView("Loading pending points...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if pendingPOIs.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 56))
                             .foregroundStyle(.green)
-                        Text("Nenhum ponto pendente")
+                        Text("No pending points")
                             .font(.headline)
-                        Text("Todos os pontos foram revisados.")
+                        Text("All points have been reviewed.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        Section("\(pendingPOIs.count) ponto(s) aguardando revisão") {
+                        Section("\(pendingPOIs.count) point(s) awaiting review") {
                             ForEach(pendingPOIs) { poi in
                                 poiCard(poi)
                             }
@@ -37,11 +38,11 @@ struct AdminView: View {
                     }
                 }
             }
-            .navigationTitle("Painel Admin")
+            .navigationTitle("Admin Panel")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fechar") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -52,6 +53,20 @@ struct AdminView: View {
                 }
             }
             .task { await reload() }
+            .alert("Reject this point?", isPresented: .init(
+                get: { rejectingPOI != nil },
+                set: { if !$0 { rejectingPOI = nil } }
+            )) {
+                Button("Cancel", role: .cancel) { rejectingPOI = nil }
+                Button("Delete", role: .destructive) {
+                    if let poi = rejectingPOI {
+                        rejectingPOI = nil
+                        Task { await reject(poi) }
+                    }
+                }
+            } message: {
+                Text("This permanently removes the point from the database. It cannot be undone.")
+            }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -116,16 +131,16 @@ struct AdminView: View {
             }
 
             // Author
-            Text("Enviado por: \(poi.author)")
+            Text("Submitted by: \(poi.author)")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
             // Action buttons
             HStack(spacing: 10) {
                 Button {
-                    Task { await reject(poi) }
+                    rejectingPOI = poi
                 } label: {
-                    Label("Rejeitar", systemImage: "xmark.circle.fill")
+                    Label("Reject", systemImage: "xmark.circle.fill")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
@@ -137,7 +152,7 @@ struct AdminView: View {
                 Button {
                     Task { await approve(poi) }
                 } label: {
-                    Label("Aprovar", systemImage: "checkmark.circle.fill")
+                    Label("Approve", systemImage: "checkmark.circle.fill")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
@@ -164,7 +179,7 @@ struct AdminView: View {
             try await appState.approvePOI(poi)
             pendingPOIs.removeAll { $0.id == poi.id }
         } catch {
-            appState.showToast("❌ Erro ao aprovar. Tente novamente.")
+            appState.showToast("❌ Error approving. Try again.")
         }
         processingId = nil
     }
@@ -175,7 +190,7 @@ struct AdminView: View {
             try await appState.rejectPOI(poi)
             pendingPOIs.removeAll { $0.id == poi.id }
         } catch {
-            appState.showToast("❌ Erro ao rejeitar. Tente novamente.")
+            appState.showToast("❌ Error rejecting. Try again.")
         }
         processingId = nil
     }

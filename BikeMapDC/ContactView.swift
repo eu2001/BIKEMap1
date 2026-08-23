@@ -19,9 +19,9 @@ struct ContactView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("BikeMap SJC")
+                            Text("BikeMap DC")
                                 .font(.headline)
-                            Text("Mapa Cicloviário de São José dos Campos")
+                            Text("Washington, DC Bike Infrastructure Map")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -30,10 +30,10 @@ struct ContactView: View {
                 }
 
                 // MARK: Contact
-                Section("Fale com a administração") {
+                Section("Contact the team") {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("E-mail")
+                            Text("Email")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Text(adminEmail)
@@ -44,22 +44,22 @@ struct ContactView: View {
                         Image(systemName: "envelope.fill")
                             .foregroundStyle(.blue)
                     }
-                    .onTapGesture { openMail(subject: "Contato - BikeMap SJC", body: "") }
+                    .onTapGesture { openMail(subject: "Contact - BikeMap DC", body: "") }
 
-                    Text("Dúvidas, sugestões ou informações sobre o mapa cicloviário de SJC? Entre em contato com a equipe.")
+                    Text("Questions, suggestions, or info about DC's bike map? Reach out to the team.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
                 // MARK: Report error
-                Section("Reportar problema") {
+                Section("Report a problem") {
                     Button {
                         openMail(
-                            subject: "Reportar Erro - BikeMap SJC",
-                            body: "Descreva o problema encontrado no mapa:\n\n"
+                            subject: "Report an issue - BikeMap DC",
+                            body: "Describe the problem you found on the map:\n\n"
                         )
                     } label: {
-                        Label("Reportar erro no mapa", systemImage: "exclamationmark.bubble.fill")
+                        Label("Report a map issue", systemImage: "exclamationmark.bubble.fill")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -69,17 +69,17 @@ struct ContactView: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(.init(top: 4, leading: 12, bottom: 4, trailing: 12))
 
-                    Text("Encontrou um erro ou informação desatualizada no mapa? Use o botão acima para nos avisar por e-mail.")
+                    Text("Found a mistake or outdated info on the map? Use the button above to let us know by email.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
             }
-            .navigationTitle("Sobre o App")
+            .navigationTitle("About")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fechar") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
             }
         }

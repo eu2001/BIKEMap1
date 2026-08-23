@@ -25,7 +25,7 @@ struct BikeFormView: View {
     private var isEditing: Bool { existing != nil }
 
     // Aro presets
-    private let aroOptions = ["20\"", "24\"", "26\"", "27.5\"", "29\"", "700c", "Outro"]
+    private let aroOptions = ["20\"", "24\"", "26\"", "27.5\"", "29\"", "700c", "Other"]
 
     var body: some View {
         NavigationStack {
@@ -77,24 +77,24 @@ struct BikeFormView: View {
                 }
 
                 // MARK: Basic info
-                Section("Identificação") {
-                    TextField("Apelido da bike *", text: $nickname)
-                    TextField("Marca (ex: Trek, Caloi, Scott…)", text: $brand)
-                    TextField("Cor", text: $color)
-                    Picker("Aro", selection: $aro) {
-                        Text("Selecionar").tag("")
+                Section("Identification") {
+                    TextField("Bike nickname *", text: $nickname)
+                    TextField("Brand (e.g. Trek, Specialized, Cannondale…)", text: $brand)
+                    TextField("Color", text: $color)
+                    Picker("Wheel size", selection: $aro) {
+                        Text("Select").tag("")
                         ForEach(aroOptions, id: \.self) { Text($0).tag($0) }
                     }
                 }
 
-                Section("Segurança") {
-                    TextField("Número de série", text: $serialNumber)
+                Section("Security") {
+                    TextField("Serial number", text: $serialNumber)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.characters)
                 }
 
-                Section("Detalhes adicionais") {
-                    TextField("Ex: marcas, adesivos, componentes especiais…",
+                Section("Additional details") {
+                    TextField("e.g. scratches, stickers, special components…",
                               text: $details, axis: .vertical)
                         .lineLimit(3...6)
                 }
@@ -115,7 +115,7 @@ struct BikeFormView: View {
                             if loading {
                                 ProgressView().tint(.white)
                             } else {
-                                Text(isEditing ? "Salvar alterações" : "Registrar bike")
+                                Text(isEditing ? "Save changes" : "Register bike")
                                     .fontWeight(.semibold)
                             }
                         }
@@ -126,11 +126,11 @@ struct BikeFormView: View {
                     .foregroundStyle(.white)
                 }
             }
-            .navigationTitle(isEditing ? "Editar Bike" : "Nova Bike")
+            .navigationTitle(isEditing ? "Edit Bike" : "New Bike")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
             .onAppear { prefill() }

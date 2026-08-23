@@ -24,7 +24,7 @@ struct AddPointView: View {
         NavigationStack {
             Form {
 
-                Section("Localização selecionada") {
+                Section("Selected location") {
                     if let coord = coordinate {
                         HStack {
                             Image(systemName: "mappin.circle.fill").foregroundStyle(.red)
@@ -33,7 +33,7 @@ struct AddPointView: View {
                                 .foregroundStyle(.secondary)
                         }
                         if outOfBounds {
-                            Label(SJCBounds.outOfBoundsMessage, systemImage: "exclamationmark.triangle.fill")
+                            Label(DCBounds.outOfBoundsMessage, systemImage: "exclamationmark.triangle.fill")
                                 .font(.caption)
                                 .foregroundStyle(.orange)
                         }
@@ -49,12 +49,12 @@ struct AddPointView: View {
                         .listRowInsets(.init(top: 8, leading: 0, bottom: 8, trailing: 0))
                         .padding(.horizontal, -4)
                     } else {
-                        Label("Nenhuma localização selecionada", systemImage: "exclamationmark.triangle")
+                        Label("No location selected", systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.orange)
                     }
                 }
 
-                Section("Tipo de ponto") {
+                Section("Point type") {
                     Label {
                         Text(selectedType.label).foregroundStyle(.primary)
                     } icon: {
@@ -62,9 +62,9 @@ struct AddPointView: View {
                     }
                 }
 
-                Section("Informações") {
-                    TextField("Título *", text: $title)
-                    TextField("Descrição (opcional)", text: $description, axis: .vertical)
+                Section("Details") {
+                    TextField("Title *", text: $title)
+                    TextField("Description (optional)", text: $description, axis: .vertical)
                         .lineLimit(3...6)
                 }
 
@@ -74,7 +74,7 @@ struct AddPointView: View {
                     } label: {
                         HStack {
                             Text(selectedType.emoji)
-                            Text("Adicionar \(selectedType.label)")
+                            Text("Add \(selectedType.label)")
                                 .fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity)
@@ -82,11 +82,11 @@ struct AddPointView: View {
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || coordinate == nil || outOfBounds)
                 }
             }
-            .navigationTitle("Novo Ponto")
+            .navigationTitle("New Point")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -94,7 +94,7 @@ struct AddPointView: View {
         .presentationDragIndicator(.visible)
         .onChange(of: coordinate?.latitude) { _, _ in
             if let coord = coordinate {
-                outOfBounds = !SJCBounds.contains(coord)
+                outOfBounds = !DCBounds.contains(coord)
             }
         }
     }
@@ -102,7 +102,7 @@ struct AddPointView: View {
     private func submit() {
         guard let coord = coordinate,
               !title.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        guard SJCBounds.contains(coord) else { outOfBounds = true; return }
+        guard DCBounds.contains(coord) else { outOfBounds = true; return }
         appState.addPOI(
             type: selectedType,
             coordinate: coord,
